@@ -9,7 +9,7 @@ pipeline {
         stage('Setup APIM Environments'){
             steps{
                 withCredentials([usernamePassword(credentialsId: 'apim', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]){
-                    sh 'bash ./config.sh'
+                    bat '"C:\\Program Files\\Git\\usr\\bin\\bash.exe" config.sh'
                 }
             }
         }
