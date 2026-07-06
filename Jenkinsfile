@@ -9,7 +9,7 @@ pipeline {
         stage('Setup APIM Environments'){
             steps{
                 withCredentials([usernamePassword(credentialsId: 'apim', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]){
-                sh config.sh
+                   sh './config.sh'
                 }
             }
         }
