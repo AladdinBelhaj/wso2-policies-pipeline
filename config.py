@@ -1,8 +1,8 @@
 import subprocess
+import os
 
-
-username=${USERNAME}
-password=${PASSWORD}
+username = os.environ.get('USERNAME')
+password = os.environ.get('PASSWORD')
 
 print('Checking apictl installation')
 subprocess.run(['apictl', 'version'])
