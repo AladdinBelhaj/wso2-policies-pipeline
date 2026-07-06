@@ -1,0 +1,191 @@
+type: api
+version: v4.7.0
+data:
+  id: 2748d335-8e67-4724-b04d-6e6e13a32415
+  name: PizzaShackAPI
+  displayName: PizzaShackAPI
+  description: This is a simple API for Pizza Shack online pizza delivery store.
+  context: /pizzashack
+  version: 1.0.0
+  provider: admin
+  lifeCycleStatus: PUBLISHED
+  responseCachingEnabled: false
+  cacheTimeout: 300
+  hasThumbnail: false
+  isDefaultVersion: false
+  isRevision: false
+  revisionId: 0
+  enableSchemaValidation: false
+  enableSubscriberVerification: false
+  type: HTTP
+  audiences:
+   - all
+  transport:
+   - http
+   - https
+  tags:
+   - pizza
+  policies:
+   - Unlimited
+  organizationPolicies: []
+  authorizationHeader: Authorization
+  apiKeyHeader: ApiKey
+  securityScheme:
+   - oauth_basic_auth_api_key_mandatory
+   - oauth2
+  visibility: PUBLIC
+  visibleRoles: []
+  visibleTenants: []
+  visibleOrganizations:
+   - none
+  mediationPolicies: []
+  apiHubPolicies: []
+  subscriptionAvailability: CURRENT_TENANT
+  subscriptionAvailableTenants: []
+  additionalProperties: []
+  additionalPropertiesMap: {}
+  accessControl: NONE
+  accessControlRoles: []
+  businessInformation:
+    businessOwner: Jane Roe
+    businessOwnerEmail: marketing@pizzashack.com
+    technicalOwner: John Doe
+    technicalOwnerEmail: architecture@pizzashack.com
+  corsConfiguration:
+    corsConfigurationEnabled: false
+    accessControlAllowOrigins:
+     - '*'
+    accessControlAllowCredentials: false
+    accessControlAllowHeaders:
+     - authorization
+     - Access-Control-Allow-Origin
+     - Content-Type
+     - SOAPAction
+     - apikey
+     - Internal-Key
+    accessControlAllowMethods:
+     - GET
+     - PUT
+     - POST
+     - DELETE
+     - PATCH
+     - OPTIONS
+  websubSubscriptionConfiguration:
+    enable: false
+    secret: ""
+    signingAlgorithm: SHA1
+    signatureHeader: x-hub-signature
+  createdTime: "1783066705214"
+  lastUpdatedTimestamp: "1783092580775"
+  lastUpdatedTime: 2026-07-03 16:29:40.775
+  endpointConfig:
+    endpoint_type: http
+    sandbox_endpoints:
+      url: https://localhost:9443/am/sample/pizzashack/v1/api/
+    production_endpoints:
+      url: https://localhost:9443/am/sample/pizzashack/v1/api/
+  endpointImplementationType: ENDPOINT
+  subtypeConfiguration:
+    subtype: DEFAULT
+  scopes:
+   -
+    scope:
+      name: GET
+      displayName: GET
+      description: ""
+      bindings: []
+    shared: false
+  operations:
+   -
+    id: ""
+    target: /order
+    verb: POST
+    authType: Application & Application User
+    throttlingPolicy: Unlimited
+    scopes: []
+    usedProductIds: []
+    operationPolicies:
+      request:
+       -
+        policyName: addHeader
+        policyVersion: v3
+        policyType: common
+        policyId: 512e30af-11c2-40b3-a331-e98d70b039cc
+        parameters:
+          headerValue: Test
+          headerName: WSO2
+      response:
+       -
+        policyName: jsonToXML
+        policyVersion: v1
+        policyType: common
+        policyId: 3dd9e5ae-7163-4d3b-abec-3421bbec0211
+        parameters: {}
+      fault: []
+    operationHubPolicies: []
+   -
+    id: ""
+    target: /menu
+    verb: GET
+    authType: Application & Application User
+    throttlingPolicy: Unlimited
+    scopes:
+     - GET
+    usedProductIds: []
+    operationPolicies:
+      request: []
+      response: []
+      fault: []
+    operationHubPolicies: []
+   -
+    id: ""
+    target: "/order/{orderId}"
+    verb: GET
+    authType: Application & Application User
+    throttlingPolicy: Unlimited
+    scopes: []
+    usedProductIds: []
+    operationPolicies:
+      request: []
+      response: []
+      fault: []
+    operationHubPolicies: []
+   -
+    id: ""
+    target: "/order/{orderId}"
+    verb: PUT
+    authType: Application & Application User
+    throttlingPolicy: Unlimited
+    scopes: []
+    usedProductIds: []
+    operationPolicies:
+      request: []
+      response: []
+      fault: []
+    operationHubPolicies: []
+   -
+    id: ""
+    target: "/order/{orderId}"
+    verb: DELETE
+    authType: Application & Application User
+    throttlingPolicy: Unlimited
+    scopes: []
+    usedProductIds: []
+    operationPolicies:
+      request: []
+      response: []
+      fault: []
+    operationHubPolicies: []
+  categories: []
+  keyManagers:
+   - all
+  advertiseInfo:
+    advertised: false
+    apiOwner: admin
+    vendor: WSO2
+  gatewayVendor: wso2
+  gatewayType: wso2/synapse
+  initiatedFromGateway: false
+  asyncTransportProtocols: []
+  egress: false
+  organizationId: carbon.super
