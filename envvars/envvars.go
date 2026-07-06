@@ -1,11 +1,9 @@
-package env_vars
+package envvars
 
 import (
 "bufio"
-"fmt"
 "log"
 "os"
-"os/exec"
 "strings"
 )
 
@@ -13,7 +11,7 @@ var BaseUrl string
 var Username string
 var Password string
 
-func LoadEnvVars() {
+func Load() {
 //	Open the .env file
 envFile, err := os.Open("./.env")
 //	check for errors
