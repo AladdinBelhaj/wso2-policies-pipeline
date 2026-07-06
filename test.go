@@ -5,6 +5,7 @@ import (
 "fmt"
 "log"
 "os"
+"os/exec"
 "strings"
 )
 
@@ -17,7 +18,15 @@ func main() {
 setENV()
 
 fmt.Println(baseUrl)
+fmt.Println(username)
+fmt.Println(password)
 
+    cmd := exec.Command("curl", "-u", username + ":" + password, baseUrl + "/apis", "-k")
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(out))
 }
 
 func setENV() {
