@@ -1,4 +1,4 @@
-package main
+package env_vars
 
 import (
 "bufio"
@@ -9,27 +9,11 @@ import (
 "strings"
 )
 
-var baseUrl string
-var username string
-var password string
+var BaseUrl string
+var Username string
+var Password string
 
-func main() {
-
-setENV()
-
-fmt.Println(baseUrl)
-fmt.Println(username)
-fmt.Println(password)
-
-    cmd := exec.Command("curl", "-u", username + ":" + password, baseUrl + "/apis", "-k")
-	out, err := cmd.Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(out))
-}
-
-func setENV() {
+func LoadEnvVars() {
 //	Open the .env file
 envFile, err := os.Open("./.env")
 //	check for errors
@@ -55,7 +39,7 @@ if err := scanner.Err(); err !=  nil {
 log.Fatal(err)
 }
 // assign the environment variable using the os.Getenv method
-baseUrl = os.Getenv("BASE_URL")
-username = os.Getenv("USERNAME")
-password = os.Getenv("PASSWORD")
+BaseUrl = os.Getenv("BASE_URL")
+Username = os.Getenv("USERNAME")
+Password = os.Getenv("PASSWORD")
 }
