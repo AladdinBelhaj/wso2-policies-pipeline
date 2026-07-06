@@ -18,7 +18,7 @@ fmt.Println(baseUrl)
 
 }
 
-func  SetENV() {
+func setENV() {
 
 //	Open the .env file
 envFile, err := os.Open("./.env")
