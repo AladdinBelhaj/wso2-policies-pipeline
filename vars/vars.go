@@ -1,4 +1,5 @@
-package envvars
+// This file fetches environment variables from the .env file and assigns them to global variables for use in the application.
+package vars
 
 import (
 "bufio"

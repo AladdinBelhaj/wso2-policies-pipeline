@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"wso2/scripts/envvars"
+	"wso2/scripts/vars"
 )
 func main() {
 
-	envvars.Load()
+	vars.Load()
 
-    cmd := exec.Command("curl", "-u", envvars.Username + ":" + envvars.Password, envvars.BaseUrl + "/apis", "-k")
+    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
 	out, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
