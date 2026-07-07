@@ -10,7 +10,7 @@ import (
 )
 func main() {
 
-	var data map[string]any
+	
 // Load the environment variables from the .env file
 	vars.Load()
 // Create a new command to execute the curl command with the environment variables
@@ -22,22 +22,34 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// err :=
-	json.Unmarshal(out, &data)
+	fetchAPIs(out)
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 
-	fmt.Println(data)
+
+}
+
+
+func fetchAPIs(out []byte) {
+    var data map[string]any
 
 	apis := make([]string, 0)
 
+
+    err := json.Unmarshal(out, &data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+
 	list := data["list"].([]interface{})
+
 	for _, item := range list {
 		api := item.(map[string]interface{})
-		
+
 		apis = append(apis, api["id"].(string))
 	}
+
+	fmt.Println(apis)
 
 }
