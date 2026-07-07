@@ -11,37 +11,17 @@ import (
 func main() {
 
 	vars.Load()
-	apiIds := extractApiIds()
-	apiPolicies := extractApiPolicies(apiIds)
+	// apiIds := extractApiIds()
+	// apiPolicies := extractApiPolicies(apiIds)
 
-	marshalledData, err := json.MarshalIndent(apiPolicies, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(string(marshalledData))
-
-	//     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
-	// 	out, err := cmd.Output()
-	// 	if err != nil {
+	// marshalledData, err := json.MarshalIndent(apiPolicies, "", "  ")
+	// if err != nil {
 	// 	log.Fatal(err)
 	// }
 
-	// fmt.Println(string(out))
+	// fmt.Println(string(marshalledData))
+	updateOperationPolicies()
 
-	// var data map[string]any
-
-    // json.Unmarshal(out, &data)
-
-	// list := data["list"].([]interface{})
-
-	// for _, item := range list {
-	//    policy := item.(map[string]interface{})
-    //    fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
-	
-	// }
-
-	
 }
 
 // This function executes a curl command to fetch the JSON object from the /apis endpoint
@@ -85,7 +65,6 @@ func extractApiIds() []string {
 }
 
 
-
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
 func getApiDetailsJsonObject(apiId string) []byte {
 
@@ -110,28 +89,7 @@ func extractApiPolicies(apiIds []string) []map[string]any{
 			log.Fatal(err)
 		}
 
-		operations := make([]map[string]any, 0)
-
-		for _, operation := range api["operations"].([]interface{}) {
-			op := operation.(map[string]interface{})
-
-			operationObject := map[string]any{
-				"target":            op["target"],
-				"verb":              op["verb"],
-				"operationPolicies": op["operationPolicies"],
-			}
-
-			operations = append(operations, operationObject)
-		}
-
-		apiObject := map[string]any{
-			"apiId":      api["id"],
-			"operations": operations,
-		}
-
-		apiPolicies = append(apiPolicies, apiObject)
 	}
-
 
 	return apiPolicies
 
@@ -139,7 +97,7 @@ func extractApiPolicies(apiIds []string) []map[string]any{
 
 
 
-func getOperationPoliciesJsonObject() []byte {
+func getOperationPoliciesJsonObject() []byte{
 
 	cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
 	jsonObject, err := cmd.Output()
@@ -147,4 +105,34 @@ func getOperationPoliciesJsonObject() []byte {
 		log.Fatal(err)
 	}
 	return jsonObject
+}
+
+func extractOperationPolicies() []map[string]interface{} {
+	jsonObject := getOperationPoliciesJsonObject()
+
+	var data map[string]any
+
+	err := json.Unmarshal(jsonObject, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	list := data["list"].([]interface{})
+
+	var policies []map[string]interface{}
+
+	for _, item := range list {
+		policy := item.(map[string]interface{})
+
+		policies = append(policies, map[string]interface{}{
+			"id":      policy["id"],
+			"name":    policy["name"],
+			"type":    policy["type"],
+			"version": policy["version"],
+		})
+
+		fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
+	}
+
+	return policies
 }
