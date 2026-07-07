@@ -11,32 +11,38 @@ import (
 func main() {
 
 	vars.Load()
-	// apiIds := extractApiIds()
-	// apiPolicies := extractApiPolicies(apiIds)
+	apiIds := extractApiIds()
+	apiPolicies := extractApiPolicies(apiIds)
 
-	    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
-		out, err := cmd.Output()
-		if err != nil {
+	marshalledData, err := json.MarshalIndent(apiPolicies, "", "  ")
+	if err != nil {
 		log.Fatal(err)
 	}
 
+	fmt.Println(string(marshalledData))
+
+	//     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
+	// 	out, err := cmd.Output()
+	// 	if err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	// fmt.Println(string(out))
 
-	var data map[string]any
+	// var data map[string]any
 
-    json.Unmarshal(out, &data)
+    // json.Unmarshal(out, &data)
 
-	list := data["list"].([]interface{})
+	// list := data["list"].([]interface{})
 
-	for _, item := range list {
-	   policy := item.(map[string]interface{})
-       fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
+	// for _, item := range list {
+	//    policy := item.(map[string]interface{})
+    //    fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
 	
-	}
-	    
+	// }
+
+	
 }
-
-
 
 // This function executes a curl command to fetch the JSON object from the /apis endpoint
 func getApiJsonObject() []byte {
@@ -49,8 +55,6 @@ func getApiJsonObject() []byte {
 
 	return jsonObject
 }
-
-
 
 
 // This function iterates through the JSON object and fetches the ID of each API
@@ -85,21 +89,18 @@ func extractApiIds() []string {
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
 func getApiDetailsJsonObject(apiId string) []byte {
 
-
     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis/" + apiId, "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	return jsonObject
-
 }
 
 // This function iterates through the list of API IDs and fetches the details for each API, extracting the policies for each operation
 func extractApiPolicies(apiIds []string) []map[string]any{
 
-	 apiPolicies := make([]map[string]any, 0)
+	apiPolicies := make([]map[string]any, 0)
 
 	for _, apiId := range apiIds {
 		var api map[string]any
@@ -136,3 +137,14 @@ func extractApiPolicies(apiIds []string) []map[string]any{
 
 }
 
+
+
+func getOperationPoliciesJsonObject() []byte {
+
+	cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
+	jsonObject, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return jsonObject
+}
