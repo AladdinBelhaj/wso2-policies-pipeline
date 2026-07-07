@@ -20,7 +20,7 @@ func main() {
 	// }
 
 	// fmt.Println(string(marshalledData))
-	updateOperationPolicies()
+	extractOperationPolicies()
 
 }
 
@@ -127,11 +127,9 @@ func extractOperationPolicies() []map[string]interface{} {
 		policies = append(policies, map[string]interface{}{
 			"id":      policy["id"],
 			"name":    policy["name"],
-			"type":    policy["type"],
 			"version": policy["version"],
 		})
 
-		fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
 	}
 
 	return policies
