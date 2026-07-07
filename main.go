@@ -1,4 +1,4 @@
-// This file executes a curl command to fetch APIs from the WSO2 API Manager using environment variables for authentication.
+// This file executes fetches each API's details and extracts the policies for each operation
 package main
 
 import (
@@ -10,25 +10,33 @@ import (
 )
 func main() {
 
-// Load the environment variables from the .env file
 	vars.Load()
-    
 	apiIds := extractApiIds()
-
 	extractApiPolicies(apiIds)
 
 }
 
+
+// This function executes a curl command to fetch the JSON object from the /apis endpoint
+func getApiJsonObject() []byte {
+
+    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
+	jsonObject, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return jsonObject
+}
+
 // This function iterates through the JSON object and fetches the ID of each API
 func extractApiIds() []string {
-
 
 	jsonObject := getApiJsonObject()
 
     var data map[string]any
 
 	apiIds := make([]string, 0)
-
 
     err := json.Unmarshal(jsonObject, &data)
 
@@ -48,29 +56,12 @@ func extractApiIds() []string {
 	return apiIds
 }
 
-func getApiJsonObject() []byte {
-
-	// Create a new command to execute the curl command with the environment variables
-    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
-	// Execute the command and capture the output
-	jsonObject, err := cmd.Output()
-	// Check for errors and log them if any
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return jsonObject
-}
-
-
+// This function extracts the API IDs from the JSON object returned by the /apis endpoint
 func getApiDetailsJsonObject(apiId string) []byte {
 
 
-	// Create a new command to execute the curl command with the environment variables
     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis/" + apiId, "-k")
-	// Execute the command and capture the output
 	jsonObject, err := cmd.Output()
-	// Check for errors and log them if any
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,6 +70,7 @@ func getApiDetailsJsonObject(apiId string) []byte {
 
 }
 
+// This function iterates through the list of API IDs and fetches the details for each API, extracting the policies for each operation
 func extractApiPolicies(apiIds []string) {
 
 	 apiPolicies := make([]map[string]any, 0)
