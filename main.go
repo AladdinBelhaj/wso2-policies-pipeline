@@ -132,5 +132,5 @@ func extractOperationPolicies() []map[string]interface{} {
 
 	}
 
-	return policies
+	return allPolicies
 }
