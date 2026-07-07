@@ -113,7 +113,13 @@ func extractApiPolicies(apiIds []string) {
 		apiPolicies = append(apiPolicies, apiObject)
 	}
 
-	fmt.Println(apiPolicies)
+	output, err := json.MarshalIndent(apiPolicies, "", "  ")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println(string(output))
 
 
-	}
+}
+
