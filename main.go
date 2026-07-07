@@ -11,7 +11,7 @@ import (
 func main() {
 
 	vars.Load()
-	// apiIds := extractApiIds()
+	apiIds := extractApiIds()
 	// apiPolicies := extractApiPolicies(apiIds)
 
 	// marshalledData, err := json.MarshalIndent(apiPolicies, "", "  ")
@@ -20,7 +20,7 @@ func main() {
 	// }
 
 	// fmt.Println(string(marshalledData))
-	extractOperationPolicies()
+extractApiPolicies(apiIds)
 
 }
 
@@ -77,9 +77,9 @@ func getApiDetailsJsonObject(apiId string) []byte {
 }
 
 // This function iterates through the list of API IDs and fetches the details for each API, extracting the policies for each operation
-func extractApiPolicies(apiIds []string) []map[string]any{
+func extractApiPolicies(apiIds []string) {
 
-	apiPolicies := make([]map[string]any, 0)
+	 apiPolicies := make([]map[string]any, 0)
 
 	for _, apiId := range apiIds {
 		var api map[string]any
@@ -89,11 +89,39 @@ func extractApiPolicies(apiIds []string) []map[string]any{
 			log.Fatal(err)
 		}
 
+		operations := make([]map[string]any, 0)
+
+		for _, operation := range api["operations"].([]interface{}) {
+			op := operation.(map[string]interface{})
+
+			operationObject := map[string]any{
+				"target":            op["target"],
+				"verb":              op["verb"],
+				"operationPolicies": op["operationPolicies"],
+			}
+
+			operations = append(operations, operationObject)
+		}
+
+		apiObject := map[string]any{
+			"apiId":      api["id"],
+			"operations": operations,
+		}
+
+		apiPolicies = append(apiPolicies, apiObject)
 	}
 
-	return apiPolicies
+	output, err := json.MarshalIndent(apiPolicies, "", "  ")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println(string(output))
+
 
 }
+
+
 
 
 
@@ -119,12 +147,12 @@ func extractOperationPolicies() []map[string]interface{} {
 
 	list := data["list"].([]interface{})
 
-	var policies []map[string]interface{}
+	var allPolicies []map[string]interface{}
 
 	for _, item := range list {
 		policy := item.(map[string]interface{})
 
-		policies = append(policies, map[string]interface{}{
+		allPolicies = append(allPolicies, map[string]interface{}{
 			"id":      policy["id"],
 			"name":    policy["name"],
 			"version": policy["version"],
