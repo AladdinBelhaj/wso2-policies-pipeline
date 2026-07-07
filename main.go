@@ -10,17 +10,7 @@ import (
 )
 func main() {
 
-	
-// Load the environment variables from the .env file
-	vars.Load()
-// Create a new command to execute the curl command with the environment variables
-    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
-// Execute the command and capture the output
-	out, err := cmd.Output()
-// Check for errors and log them if any
-	if err != nil {
-		log.Fatal(err)
-	}
+    getApiJsonObject()
 
 	fetchAPIs(out)
 
@@ -28,8 +18,10 @@ func main() {
 
 }
 
+// This function iterates through the JSON object and fetches the ID of each API
+func fetchAPIs() {
 
-func fetchAPIs(out []byte) {
+	out = getApiJsonObject()
     var data map[string]any
 
 	apis := make([]string, 0)
@@ -52,4 +44,20 @@ func fetchAPIs(out []byte) {
 
 	fmt.Println(apis)
 
+}
+
+func getApiJsonObject(){
+
+	// Load the environment variables from the .env file
+	vars.Load()
+	// Create a new command to execute the curl command with the environment variables
+    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
+	// Execute the command and capture the output
+	out, err := cmd.Output()
+	// Check for errors and log them if any
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return out
 }
