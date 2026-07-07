@@ -21,12 +21,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
-	err := json.Unmarshal(out, &data)
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	// err :=
+	json.Unmarshal(out, &data)
+
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	fmt.Println(data)
+
+	apis := make([]string, 0)
+
+	list := data["list"].([]interface{})
+	for _, item := range list {
+		api := item.(map[string]interface{})
+		
+		apis = append(apis, api["id"].(string))
+	}
 
 }
