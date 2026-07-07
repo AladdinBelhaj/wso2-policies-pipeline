@@ -12,18 +12,10 @@ func main() {
 
 // Load the environment variables from the .env file
 	vars.Load()
-
-    getApiJsonObject()
-
+    
 	apiIds := extractApiIds()
 
-	apiDetails := make([][]byte, 0)
-
-	for _, apiId := range apiIds {
-		apiDetails = append(apiDetails, getApiDetailsJsonObject(apiId))
-	}
-    
-
+	extractApiPolicies(apiIds)
 
 }
 
@@ -32,6 +24,7 @@ func extractApiIds() []string {
 
 
 	jsonObject := getApiJsonObject()
+
     var data map[string]any
 
 	apiIds := make([]string, 0)
@@ -86,24 +79,41 @@ func getApiDetailsJsonObject(apiId string) []byte {
 
 }
 
-func extractApiPolicies(apiId string) []string {
+func extractApiPolicies(apiIds []string) {
 
-	jsonObject := getApiDetailsJsonObject(apiId)
-	var data map[string]any
+	 apiPolicies := make([]map[string]any, 0)
 
-	err := json.Unmarshal(jsonObject, &data)
-	if err != nil {
-		log.Fatal(err)
+	for _, apiId := range apiIds {
+		var api map[string]any
+		data := getApiDetailsJsonObject(apiId)
+		err := json.Unmarshal(data, &api)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		operations := make([]map[string]any, 0)
+
+		for _, operation := range api["operations"].([]interface{}) {
+			op := operation.(map[string]interface{})
+
+			operationObject := map[string]any{
+				"target":            op["target"],
+				"verb":              op["verb"],
+				"operationPolicies": op["operationPolicies"],
+			}
+
+			operations = append(operations, operationObject)
+		}
+
+		apiObject := map[string]any{
+			"apiId":      api["id"],
+			"operations": operations,
+		}
+
+		apiPolicies = append(apiPolicies, apiObject)
 	}
 
-	list := data["list"].([]interface{})
+	fmt.Println(apiPolicies)
 
-	apiPolicies := make([]string, 0)
 
-	for _, item := range list {
-		api := item.(map[string]interface{})
-		apiPolicies = append(apiPolicies, api["policies"].([]string)...)
 	}
-
-	return apiPolicies
-}
