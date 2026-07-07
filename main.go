@@ -12,7 +12,7 @@ func main() {
 
     getApiJsonObject()
 
-	fetchAPIs(out)
+	fetchAPIs()
 
 
 
@@ -21,13 +21,14 @@ func main() {
 // This function iterates through the JSON object and fetches the ID of each API
 func fetchAPIs() {
 
-	out = getApiJsonObject()
+
+	jsonObject := getApiJsonObject()
     var data map[string]any
 
 	apis := make([]string, 0)
 
 
-    err := json.Unmarshal(out, &data)
+    err := json.Unmarshal(jsonObject, &data)
 
 	if err != nil {
 		log.Fatal(err)
@@ -46,18 +47,18 @@ func fetchAPIs() {
 
 }
 
-func getApiJsonObject(){
+func getApiJsonObject() []byte {
 
 	// Load the environment variables from the .env file
 	vars.Load()
 	// Create a new command to execute the curl command with the environment variables
     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
 	// Execute the command and capture the output
-	out, err := cmd.Output()
+	jsonObject, err := cmd.Output()
 	// Check for errors and log them if any
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return out
+	return jsonObject
 }
