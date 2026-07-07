@@ -17,10 +17,12 @@ func main() {
 
 	apiIds := extractApiIds()
 
-	for _, apiId := range apiIds {
-       getApiDetailsJsonObject(apiId)
-}
+	apiDetails := make([][]byte, 0)
 
+	for _, apiId := range apiIds {
+		apiDetails = append(apiDetails, getApiDetailsJsonObject(apiId))
+	}
+    
 
 
 }
@@ -68,7 +70,7 @@ func getApiJsonObject() []byte {
 }
 
 
-func getApiDetailsJsonObject(apiId string) {
+func getApiDetailsJsonObject(apiId string) []byte {
 
 
 	// Create a new command to execute the curl command with the environment variables
@@ -80,6 +82,28 @@ func getApiDetailsJsonObject(apiId string) {
 		log.Fatal(err)
 	}
 
-	fmt.Println(string(jsonObject))
-	
+	return jsonObject
+
+}
+
+func extractApiPolicies(apiId string) []string {
+
+	jsonObject := getApiDetailsJsonObject(apiId)
+	var data map[string]any
+
+	err := json.Unmarshal(jsonObject, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	list := data["list"].([]interface{})
+
+	apiPolicies := make([]string, 0)
+
+	for _, item := range list {
+		api := item.(map[string]interface{})
+		apiPolicies = append(apiPolicies, api["policies"].([]string)...)
+	}
+
+	return apiPolicies
 }
