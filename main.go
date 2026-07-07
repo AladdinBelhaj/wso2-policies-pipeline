@@ -10,22 +10,29 @@ import (
 )
 func main() {
 
+// Load the environment variables from the .env file
+	vars.Load()
+
     getApiJsonObject()
 
-	fetchAPIs()
+	apiIds := extractApiIds()
+
+	for _, apiId := range apiIds {
+       getApiDetailsJsonObject(apiId)
+}
 
 
 
 }
 
 // This function iterates through the JSON object and fetches the ID of each API
-func fetchAPIs() {
+func extractApiIds() []string {
 
 
 	jsonObject := getApiJsonObject()
     var data map[string]any
 
-	apis := make([]string, 0)
+	apiIds := make([]string, 0)
 
 
     err := json.Unmarshal(jsonObject, &data)
@@ -40,17 +47,14 @@ func fetchAPIs() {
 	for _, item := range list {
 		api := item.(map[string]interface{})
 
-		apis = append(apis, api["id"].(string))
+		apiIds = append(apiIds, api["id"].(string))
 	}
 
-	fmt.Println(apis)
-
+	return apiIds
 }
 
 func getApiJsonObject() []byte {
 
-	// Load the environment variables from the .env file
-	vars.Load()
 	// Create a new command to execute the curl command with the environment variables
     cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis", "-k")
 	// Execute the command and capture the output
@@ -61,4 +65,21 @@ func getApiJsonObject() []byte {
 	}
 
 	return jsonObject
+}
+
+
+func getApiDetailsJsonObject(apiId string) {
+
+
+	// Create a new command to execute the curl command with the environment variables
+    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/apis/" + apiId, "-k")
+	// Execute the command and capture the output
+	jsonObject, err := cmd.Output()
+	// Check for errors and log them if any
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(jsonObject))
+	
 }
