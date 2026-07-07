@@ -11,12 +11,30 @@ import (
 func main() {
 
 	vars.Load()
-	apiIds := extractApiIds()
-	apiPolicies := extractApiPolicies(apiIds)
+	// apiIds := extractApiIds()
+	// apiPolicies := extractApiPolicies(apiIds)
 
+	    cmd := exec.Command("curl", "-u", vars.Username + ":" + vars.Password, vars.BaseUrl + "/operation-policies", "-k")
+		out, err := cmd.Output()
+		if err != nil {
+		log.Fatal(err)
+	}
+
+	// fmt.Println(string(out))
+
+	var data map[string]any
+
+    json.Unmarshal(out, &data)
+
+	list := data["list"].([]interface{})
+
+	for _, item := range list {
+	   policy := item.(map[string]interface{})
+       fmt.Println(policy["id"], policy["name"], policy["type"], policy["version"])
+	
+	}
+	    
 }
-
-
 
 
 
@@ -61,8 +79,6 @@ func extractApiIds() []string {
 
 	return apiIds
 }
-
-
 
 
 
