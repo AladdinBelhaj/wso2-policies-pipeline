@@ -21,7 +21,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	json.Unmarshal(out, &data)
+	
+	err := json.Unmarshal(out, &data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println(data)
 
 }
