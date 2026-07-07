@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"encoding/json"
 	"wso2/scripts/vars"
 )
 func main() {
+
+	var data map[string]any
 // Load the environment variables from the .env file
 	vars.Load()
 // Create a new command to execute the curl command with the environment variables
@@ -18,5 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(string(out))
+	json.Unmarshal(out, &data)
+	fmt.Println(data)
+
 }
