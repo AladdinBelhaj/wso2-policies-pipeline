@@ -12,9 +12,12 @@ func main() {
 
 	vars.Load()
 	apiIds := extractApiIds()
-	extractApiPolicies(apiIds)
+	apiPolicies := extractApiPolicies(apiIds)
 
 }
+
+
+
 
 
 // This function executes a curl command to fetch the JSON object from the /apis endpoint
@@ -28,6 +31,9 @@ func getApiJsonObject() []byte {
 
 	return jsonObject
 }
+
+
+
 
 // This function iterates through the JSON object and fetches the ID of each API
 func extractApiIds() []string {
@@ -56,6 +62,10 @@ func extractApiIds() []string {
 	return apiIds
 }
 
+
+
+
+
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
 func getApiDetailsJsonObject(apiId string) []byte {
 
@@ -71,7 +81,7 @@ func getApiDetailsJsonObject(apiId string) []byte {
 }
 
 // This function iterates through the list of API IDs and fetches the details for each API, extracting the policies for each operation
-func extractApiPolicies(apiIds []string) {
+func extractApiPolicies(apiIds []string) []map[string]any{
 
 	 apiPolicies := make([]map[string]any, 0)
 
@@ -105,13 +115,8 @@ func extractApiPolicies(apiIds []string) {
 		apiPolicies = append(apiPolicies, apiObject)
 	}
 
-	output, err := json.MarshalIndent(apiPolicies, "", "  ")
-if err != nil {
-    log.Fatal(err)
-}
 
-fmt.Println(string(output))
-
+	return apiPolicies
 
 }
 
