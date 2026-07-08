@@ -195,7 +195,7 @@ func updateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 }
 
 // This function matches each policy in a single flow (request for example) by name
-// against the shared policies list and injects the resolved policyId.
+// against the shared policies list and injects the resolved policyId and policyVersion.
 // Returns true if any policy was updated.
 func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPolicies []map[string]interface{}) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
@@ -213,8 +213,9 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 		if !ok {
 			continue
 		}
-		if policyId, found := findPolicyIdByName(policyName, allPolicies); found {
+		if policyId, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
 			pol["policyId"] = policyId
+			pol["policyVersion"] = policyVersion
 			changed = true
 		}
 	}
@@ -222,15 +223,29 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 }
 
 // This function looks up a policy by name in the shared operation-policies list
-// and returns its id if found.
-func findPolicyIdByName(name string, allPolicies []map[string]interface{}) (string, bool) {
+// and returns the id and version of the newest version found.
+func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (string, string, bool) {
+	bestId := ""
+	bestVersion := ""
+
 	for _, policy := range allPolicies {
-		if policy["name"] == name {
-			id, ok := policy["id"].(string)
-			return id, ok
+		if policy["name"] != name {
+			continue
+		}
+		version, ok := policy["version"].(string)
+		if !ok {
+			continue
+		}
+		if version > bestVersion {
+			bestVersion = version
+			bestId, _ = policy["id"].(string)
 		}
 	}
-	return "", false
+
+	if bestId == "" {
+		return "", "", false
+	}
+	return bestId, bestVersion, true
 }
 
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
