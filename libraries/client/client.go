@@ -225,6 +225,69 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 	return "", false
 }
 
+func GetRevisionIds(apiId string) ([]string, error) {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k")
+	jsonObject, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(jsonObject, &data); err != nil {
+		return nil, err
+	}
+
+	list, ok := data["list"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected revisions response format for API %s", apiId)
+	}
+
+	revisions := make([]string, 0, len(list))
+	for _, item := range list {
+		revision, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if revisionID, ok := revision["id"].(string); ok {
+			revisions = append(revisions, revisionID)
+		}
+	}
+
+	return revisions, nil
+}
+
+func RollbackApiRevision(apiId string) error {
+	revisionIDs, err := GetRevisionIds(apiId)
+	if err != nil {
+		return fmt.Errorf("fetch revisions for API %s: %w", apiId, err)
+	}
+
+	if len(revisionIDs) < 2 {
+		return fmt.Errorf("API %s has fewer than 2 revisions; rollback is not possible", apiId)
+	}
+
+	if len(revisionIDs) == 2 {
+		return fmt.Errorf("API %s has only 2 revisions; rollback target is the first one and no extra deletion will be performed", apiId)
+	}
+
+	targetRevisionID := revisionIDs[len(revisionIDs)-2]
+	revisionToRemove := revisionIDs[len(revisionIDs)-1]
+
+	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
+	if err := DeployRevision(apiId, targetRevisionID); err != nil {
+		return fmt.Errorf("deploy rollback target for API %s: %w", apiId, err)
+	}
+
+	if len(revisionIDs) > 2 {
+		fmt.Printf("Deleting revision %s for API %s\n", revisionToRemove, apiId)
+		DeleteOldestRevision(apiId, revisionToRemove)
+	} else {
+		fmt.Printf("Skipping revision deletion for API %s because there are only 2 revisions\n", apiId)
+	}
+
+	return nil
+}
+
 func DeleteOldestRevision(apiId string, revisionId string) {
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
 		"-X", "DELETE",
@@ -290,7 +353,7 @@ func CreateRevision(apiId string) string {
 	return ""
 }
 
-func DeployRevision(apiId string, revisionId string) {
+func DeployRevision(apiId string, revisionId string) error {
 	payload := `[
 		{
 			"name": "Default",
@@ -309,21 +372,22 @@ func DeployRevision(apiId string, revisionId string) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("deploy revision curl error: %v, output: %s", err, output)
+		return fmt.Errorf("deploy revision curl error: %v, output: %s", err, output)
 	}
 
 	outStr := string(output)
 	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
 	if idx == -1 {
-		log.Fatalf("deploy revision: no status code in output: %s", outStr)
+		return fmt.Errorf("deploy revision: no status code in output: %s", outStr)
 	}
 
 	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
 	if !strings.HasPrefix(statusCode, "2") {
-		log.Fatalf("deploy revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+		return fmt.Errorf("deploy revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
 	}
 
 	fmt.Println("Revision deployed successfully")
+	return nil
 }
 
 func PrepareAndDeployRevision(apiId string) {
@@ -338,5 +402,7 @@ func PrepareAndDeployRevision(apiId string) {
 	}
 
 	fmt.Printf("Created revision %s; deploying it\n", newRevisionID)
-	DeployRevision(apiId, newRevisionID)
+	if err := DeployRevision(apiId, newRevisionID); err != nil {
+		log.Fatal(err)
+	}
 }
