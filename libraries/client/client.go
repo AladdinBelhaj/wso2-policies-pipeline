@@ -194,17 +194,15 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 	return "", false
 }
 
-
-func DeleteOldestRevision(apiId string, revisionId string){
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "DELETE", vars.BaseUrl+ "/apis/" + apiId + "/revisions/" + revisionId, "-k")
+func DeleteOldestRevision(apiId string, revisionId string) {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "DELETE", vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId, "-k")
 	_, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-
-func CreateRevision(apiId string) string{
+func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
 		"-X", "POST",
@@ -231,7 +229,6 @@ func CreateRevision(apiId string) string{
 	}
 
 	body := strings.TrimSpace(outStr[:idx])
-
 	var data map[string]any
 	if err := json.Unmarshal([]byte(body), &data); err != nil {
 		log.Fatalf("create revision response parse error: %v, body: %s", err, body)
@@ -242,15 +239,17 @@ func CreateRevision(apiId string) string{
 	}
 
 	return ""
-
 }
-
 
 func DeployRevision(apiId string, revisionId string) {
 	payload := []byte(`{"action":"deploy"}`)
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/deploy-revision?revisionId="+revisionId, "-k")
-
-	cmd.Stdin = strings.NewReader(string(payload))
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+		"-X", "POST",
+		vars.BaseUrl+"/apis/"+apiId+"/deploy-revision?revisionId="+revisionId,
+		"-H", "Content-Type: application/json",
+		"-d", string(payload),
+		"-k",
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -259,4 +258,29 @@ func DeployRevision(apiId string, revisionId string) {
 
 	outStr := string(output)
 	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
+	if idx == -1 {
+		log.Fatalf("deploy revision: no status code in output: %s", outStr)
+	}
+
+	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
+	if !strings.HasPrefix(statusCode, "2") {
+		log.Fatalf("deploy revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+	}
+
+	fmt.Println("Revision deployed successfully")
+}
+
+func PrepareAndDeployRevision(apiId string) {
+	if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
+		fmt.Printf("Found 5 revisions; deleting oldest revision %s\n", oldestRevision)
+		DeleteOldestRevision(apiId, oldestRevision)
+	}
+
+	newRevisionID := CreateRevision(apiId)
+	if newRevisionID == "" {
+		log.Fatal("failed to create a new revision")
+	}
+
+	fmt.Printf("Created revision %s; deploying it\n", newRevisionID)
+	DeployRevision(apiId, newRevisionID)
 }
