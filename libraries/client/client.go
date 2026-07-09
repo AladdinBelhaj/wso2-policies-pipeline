@@ -171,7 +171,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 }
 
 
-func ReviewRevisionsNumber(apiId string) {
+func ReviewRevisionsNumber(apiId string) bool, string {
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+ "/apis/" + apiId + "/revisions", "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
@@ -182,16 +182,15 @@ func ReviewRevisionsNumber(apiId string) {
 
 	json.Unmarshal(jsonObject, &data)
 
-	// count := data["count"].(float64)
+	count := data["count"].(float64)
 
-	// if count == 5 {
-	// 	return true
-	// } else{
-	// 	return false
-	// }
+	if count == 5 {
+		list := data["list"].([]interface{})
+		return list[0].(map[string]interface{})["id"], true
+	} else{
+		return "", false
+	}
 
-	list := data["list"].([]interface{})
-	fmt.Println(list[0].(map[string]interface{})["id"])
 }
 
 
