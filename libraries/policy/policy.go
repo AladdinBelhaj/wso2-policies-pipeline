@@ -7,42 +7,6 @@ import (
 	"wso2/scripts/libraries/client"
 )
 
-func buildPolicyLookupForApi(apiDetail map[string]any, allPolicies []map[string]interface{}) []map[string]interface{} {
-	lookup := make([]map[string]interface{}, 0, len(allPolicies))
-	lookup = append(lookup, allPolicies...)
-
-	apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
-	if !ok {
-		return lookup
-	}
-
-	for _, flow := range []string{"request", "response", "fault"} {
-		flowList, ok := apiPoliciesBlock[flow].([]interface{})
-		if !ok {
-			continue
-		}
-		for _, item := range flowList {
-			policy, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			policyName, ok := policy["policyName"].(string)
-			if !ok {
-				continue
-			}
-			policyVersion, _ := policy["policyVersion"].(string)
-			policyID, _ := policy["policyId"].(string)
-			lookup = append(lookup, map[string]interface{}{
-				"id":      policyID,
-				"name":    policyName,
-				"version": policyVersion,
-			})
-		}
-	}
-
-	return lookup
-}
-
 // This function fetches each API, resolves policy IDs by name, and PUTs the result back.
 func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]interface{}) {
 	for _, apiEntry := range apiPolicies {
@@ -54,19 +18,12 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 			log.Fatal(err)
 		}
 
-		lifecycleStatus, _ := apiDetail["lifeCycleStatus"].(string)
-		if lifecycleStatus != "PUBLISHED" {
-			log.Printf("skipping API %s because lifecycle status is %s", apiId, lifecycleStatus)
-			continue
-		}
-
 		modified := false
-		lookupPolicies := buildPolicyLookupForApi(apiDetail, allPolicies)
 
 		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 		if ok {
 			for _, flow := range []string{"request", "response", "fault"} {
-				if resolvePoliciesInFlow(apiPoliciesBlock, flow, lookupPolicies) {
+				if resolvePoliciesInFlow(apiPoliciesBlock, flow, allPolicies) {
 					modified = true
 				}
 			}
@@ -88,7 +45,7 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 				continue
 			}
 			for _, flow := range []string{"request", "response", "fault"} {
-				if resolvePoliciesInFlow(opPolicies, flow, lookupPolicies) {
+				if resolvePoliciesInFlow(opPolicies, flow, allPolicies) {
 					modified = true
 				}
 			}
