@@ -169,3 +169,25 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	fmt.Printf("PUT /apis/%s: FAILED (HTTP %s) - %s\n", apiId, statusCode, body)
 	return fmt.Errorf("HTTP %s", statusCode)
 }
+
+
+func reviewRevisionsNumber(apiId string) bool {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+ "/apis/" + apiId + "/revisions", "-k")
+	jsonObject, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	var data map[string]any
+
+	json.Unmarshal(jsonObject, &data)
+
+	list := data["list"].([]interface{})
+
+	if len(list) == 5 {
+		return false
+	} else {
+		return true
+	}
+}
+
