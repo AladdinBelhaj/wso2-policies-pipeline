@@ -131,7 +131,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 }
 
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/policies", "-k")
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/operation-policies", "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)

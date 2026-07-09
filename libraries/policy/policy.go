@@ -21,12 +21,13 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 
 		modified := false
 
+		apiScopedPolicies := append(
+			append([]map[string]interface{}{}, allPolicies...),
+			client.ExtractApiLevelPolicies(apiId)...,
+		)
+
 		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 		if ok {
-			apiScopedPolicies := append(
-				append([]map[string]interface{}{}, allPolicies...),
-				client.ExtractApiLevelPolicies(apiId)...,
-			)
 			for _, flow := range []string{"request", "response", "fault"} {
 				if resolvePoliciesInFlow(apiPoliciesBlock, flow, apiScopedPolicies) {
 					modified = true
@@ -50,7 +51,7 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 				continue
 			}
 			for _, flow := range []string{"request", "response", "fault"} {
-				if resolvePoliciesInFlow(opPolicies, flow, allPolicies) {
+				if resolvePoliciesInFlow(opPolicies, flow, apiScopedPolicies) {
 					modified = true
 				}
 			}
