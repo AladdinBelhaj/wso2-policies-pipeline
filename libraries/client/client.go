@@ -336,27 +336,24 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
-func ResolveRollbackTargets(revisionIDs []string) (string, string, bool) {
-	if len(revisionIDs) <= 1 {
-		return "", "", false
-	}
-
-	targetRevisionID := revisionIDs[len(revisionIDs)-2]
-	revisionToRemove := revisionIDs[len(revisionIDs)-1]
-	return targetRevisionID, revisionToRemove, true
-}
-
 func RollbackApiRevision(apiId string) error {
 	revisionIDs, err := GetRevisionIds(apiId)
 	if err != nil {
 		return fmt.Errorf("fetch revisions for API %s: %w", apiId, err)
 	}
 
-	targetRevisionID, revisionToRemove, ok := ResolveRollbackTargets(revisionIDs)
-	if !ok {
+	if len(revisionIDs) == 1 {
 		fmt.Printf("Cannot rollback API %s because there is only 1 revision\n", apiId)
 		return nil
 	}
+
+	if len(revisionIDs) == 2 {
+		fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiId)
+		return nil
+	}
+
+	targetRevisionID := revisionIDs[len(revisionIDs)-2]
+	revisionToRemove := revisionIDs[len(revisionIDs)-1]
 
 	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
 	if err := DeployRevision(apiId, targetRevisionID); err != nil {
