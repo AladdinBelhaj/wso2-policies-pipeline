@@ -18,13 +18,21 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 			log.Fatal(err)
 		}
 
+		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
+		if ok {
+			for _, flow := range []string{"request", "response", "fault"} {
+				if resolvePoliciesInFlow(apiPoliciesBlock, flow, allPolicies) {
+					modified = true
+				}
+			}
+		}
+
 		operations, ok := apiDetail["operations"].([]interface{})
 		if !ok {
 			continue
 		}
 
 		// Walk every operation and resolve policy IDs in each flow.
-		modified := false
 		for _, opRaw := range operations {
 			op, ok := opRaw.(map[string]interface{})
 			if !ok {
