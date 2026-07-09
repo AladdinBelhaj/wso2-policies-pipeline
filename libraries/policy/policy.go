@@ -4,7 +4,7 @@ package policy
 import (
 	"encoding/json"
 	"log"
-	"wso2/scripts/internal/client"
+	"wso2/scripts/libraries/client"
 )
 
 // This function fetches each API, resolves policy IDs by name, and PUTs the result back.
