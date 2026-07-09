@@ -18,6 +18,8 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 			log.Fatal(err)
 		}
 
+		modified := false
+
 		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 		if ok {
 			for _, flow := range []string{"request", "response", "fault"} {
