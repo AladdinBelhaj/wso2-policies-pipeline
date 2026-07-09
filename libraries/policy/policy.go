@@ -86,8 +86,8 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 // This function looks up a policy by name in the shared operation-policies list
 // and returns the id and version of the newest version found.
 func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (string, string, bool) {
-	bestId := ""
-	bestVersion := ""
+	latestId := ""
+	latestVersion := ""
 
 	for _, policy := range allPolicies {
 		if policy["name"] != name {
@@ -97,14 +97,14 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 		if !ok {
 			continue
 		}
-		if version > bestVersion {
-			bestVersion = version
-			bestId, _ = policy["id"].(string)
+		if version > latestVersion {
+			latestVersion = version
+			latestId, _ = policy["id"].(string)
 		}
 	}
 
-	if bestId == "" {
+	if latestId == "" {
 		return "", "", false
 	}
-	return bestId, bestVersion, true
+	return latestId, latestVersion, true
 }
