@@ -360,13 +360,10 @@ func RollbackApiRevision(apiId string) error {
 		return fmt.Errorf("deploy rollback target for API %s: %w", apiId, err)
 	}
 
-	if len(revisionIDs) > 2 {
+	if len(revisionIDs) >= 2 {
 		fmt.Printf("Deleting revision %s for API %s\n", revisionToRemove, apiId)
 		DeleteOldestRevision(apiId, revisionToRemove)
-	} else {
-		fmt.Printf("Skipping revision deletion for API %s because there are only 2 revisions\n", apiId)
 	}
-
 	return nil
 }
 
