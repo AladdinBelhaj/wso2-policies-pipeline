@@ -347,10 +347,10 @@ func RollbackApiRevision(apiId string) error {
 		return nil
 	}
 
-	if len(revisionIDs) == 2 {
-		fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiId)
-		return nil
-	}
+	// if len(revisionIDs) == 2 {
+	// 	fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiId)
+	// 	return nil
+	// }
 
 	targetRevisionID := revisionIDs[len(revisionIDs)-2]
 	revisionToRemove := revisionIDs[len(revisionIDs)-1]
