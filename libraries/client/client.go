@@ -194,7 +194,11 @@ func ReviewRevisionsNumber(apiId string) bool, string {
 }
 
 
-// func deleteRevision(apiId string, revisionId string) error {
-
-// }
+func deleteRevision(apiId string, revisionId string){
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "DELETE", vars.BaseUrl+ "/apis/" + apiId + "/revisions/" + revisionId, "-k")
+	_, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
