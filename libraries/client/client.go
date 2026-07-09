@@ -171,7 +171,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 }
 
 
-func reviewRevisionsNumber(apiId string) bool {
+func ReviewRevisionsNumber(apiId string) {
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+ "/apis/" + apiId + "/revisions", "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
@@ -184,10 +184,6 @@ func reviewRevisionsNumber(apiId string) bool {
 
 	list := data["list"].([]interface{})
 
-	if len(list) == 5 {
-		return false
-	} else {
-		return true
-	}
+	fmt.Println(list)
 }
 
