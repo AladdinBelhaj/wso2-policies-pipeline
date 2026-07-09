@@ -10,6 +10,11 @@ import (
 	"wso2/scripts/vars"
 )
 
+type ApiSummary struct {
+	ID   string
+	Name string
+}
+
 // This function executes a curl command to fetch the JSON object from the /apis endpoint
 func getApiJsonObject() []byte {
 
@@ -22,30 +27,73 @@ func getApiJsonObject() []byte {
 	return jsonObject
 }
 
-// This function iterates through the JSON object and fetches the ID of each API
-func ExtractApiIds() []string {
-
+// This function iterates through the JSON object and fetches the ID and name of each API.
+func ExtractApiSummaries() []ApiSummary {
 	jsonObject := getApiJsonObject()
 
 	var data map[string]any
-
-	apiIds := make([]string, 0)
-
-	err := json.Unmarshal(jsonObject, &data)
-
-	if err != nil {
+	if err := json.Unmarshal(jsonObject, &data); err != nil {
 		log.Fatal(err)
 	}
 
 	list := data["list"].([]interface{})
+	apis := make([]ApiSummary, 0, len(list))
 
 	for _, item := range list {
-		api := item.(map[string]interface{})
+		api, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-		apiIds = append(apiIds, api["id"].(string))
+		apiSummary := ApiSummary{}
+		if id, ok := api["id"].(string); ok {
+			apiSummary.ID = id
+		}
+		if name, ok := api["name"].(string); ok {
+			apiSummary.Name = name
+		}
+		apis = append(apis, apiSummary)
 	}
 
+	return apis
+}
+
+// This function iterates through the JSON object and fetches the ID of each API.
+func ExtractApiIds() []string {
+	apiSummaries := ExtractApiSummaries()
+	apiIds := make([]string, 0, len(apiSummaries))
+	for _, api := range apiSummaries {
+		if api.ID != "" {
+			apiIds = append(apiIds, api.ID)
+		}
+	}
 	return apiIds
+}
+
+func FilterApiIdsByName(apis []ApiSummary, target string) []string {
+	target = strings.TrimSpace(target)
+	if target == "" || strings.EqualFold(target, "all") {
+		ids := make([]string, 0, len(apis))
+		for _, api := range apis {
+			if api.ID != "" {
+				ids = append(ids, api.ID)
+			}
+		}
+		return ids
+	}
+
+	normalizedTarget := strings.ToLower(target)
+	matchedIDs := make([]string, 0)
+	for _, api := range apis {
+		if api.ID == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(api.Name), normalizedTarget) {
+			matchedIDs = append(matchedIDs, api.ID)
+		}
+	}
+
+	return matchedIDs
 }
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
@@ -166,7 +214,6 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 	return policies
 }
 
-
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
 func PutApiUpdate(apiId string, payload []byte) error {
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
@@ -200,7 +247,6 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	fmt.Printf("PUT /apis/%s: FAILED (HTTP %s) - %s\n", apiId, statusCode, body)
 	return fmt.Errorf("HTTP %s", statusCode)
 }
-
 
 func ReviewRevisionsNumber(apiId string) (string, bool) {
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k")
