@@ -195,11 +195,29 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 }
 
 func DeleteOldestRevision(apiId string, revisionId string) {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "DELETE", vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId, "-k")
-	_, err := cmd.Output()
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+		"-X", "DELETE",
+		vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId,
+		"-k",
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("delete revision curl error: %v, output: %s", err, out)
 	}
+
+	outStr := string(out)
+	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
+	if idx == -1 {
+		log.Fatalf("delete revision: no status code in output: %s", outStr)
+	}
+
+	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
+	if !strings.HasPrefix(statusCode, "2") {
+		log.Fatalf("delete revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+	}
+
+	fmt.Printf("Deleted revision %s successfully\n", revisionId)
 }
 
 func CreateRevision(apiId string) string {
@@ -242,12 +260,19 @@ func CreateRevision(apiId string) string {
 }
 
 func DeployRevision(apiId string, revisionId string) {
-	payload := []byte(`{"action":"deploy"}`)
+	payload := `[
+		{
+			"name": "Default",
+			"vhost": "localhost",
+			"displayOnDevportal": true
+		}
+	]`
+
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
 		"-X", "POST",
 		vars.BaseUrl+"/apis/"+apiId+"/deploy-revision?revisionId="+revisionId,
 		"-H", "Content-Type: application/json",
-		"-d", string(payload),
+		"-d", payload,
 		"-k",
 		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
