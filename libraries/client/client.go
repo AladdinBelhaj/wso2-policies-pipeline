@@ -107,15 +107,6 @@ func getOperationPoliciesJsonObject() []byte {
 	return jsonObject
 }
 
-func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/policies", "-k")
-	jsonObject, err := cmd.Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsonObject
-}
-
 func ExtractOperationPolicies() []map[string]interface{} {
 	jsonObject := getOperationPoliciesJsonObject()
 
@@ -138,6 +129,43 @@ func ExtractOperationPolicies() []map[string]interface{} {
 
 	return allPolicies
 }
+
+func getApiLevelPoliciesJsonObject(apiId string) []byte {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/policies", "-k")
+	jsonObject, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return jsonObject
+}
+
+// This function fetches and normalizes the API-specific policies for a single API.
+func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
+	jsonObject := getApiLevelPoliciesJsonObject(apiId)
+
+	var data map[string]any
+	if err := json.Unmarshal(jsonObject, &data); err != nil {
+		log.Fatal(err)
+	}
+
+	list, ok := data["list"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	policies := make([]map[string]interface{}, 0, len(list))
+	for _, item := range list {
+		policy := item.(map[string]interface{})
+		policies = append(policies, map[string]interface{}{
+			"id":      policy["id"],
+			"name":    policy["name"],
+			"version": policy["version"],
+		})
+	}
+
+	return policies
+}
+
 
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
 func PutApiUpdate(apiId string, payload []byte) error {
