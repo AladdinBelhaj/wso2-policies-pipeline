@@ -2,9 +2,11 @@
 package client
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"wso2/scripts/vars"
@@ -94,6 +96,38 @@ func FilterApiIdsByName(apis []ApiSummary, target string) []string {
 	}
 
 	return matchedIDs
+}
+
+func BuildRollbackPreview(apiIDs []string, target string) string {
+	targetLabel := "all APIs"
+	if strings.TrimSpace(target) != "" && !strings.EqualFold(target, "all") {
+		targetLabel = fmt.Sprintf("APIs matching %q", target)
+	}
+
+	preview := []string{
+		fmt.Sprintf("Dry run: %s", targetLabel),
+		fmt.Sprintf("%d API(s) will be processed:", len(apiIDs)),
+	}
+
+	for _, apiID := range apiIDs {
+		preview = append(preview, fmt.Sprintf("- %s", apiID))
+	}
+
+	return strings.Join(preview, "\n")
+}
+
+func ConfirmAction(preview string) bool {
+	fmt.Println(preview)
+	fmt.Print("Proceed? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	answer, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
 }
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
