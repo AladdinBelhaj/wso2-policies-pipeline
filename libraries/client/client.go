@@ -245,3 +245,18 @@ func CreateRevision(apiId string) string{
 
 }
 
+
+func DeployRevision(apiId string, revisionId string) {
+	payload := []byte(`{"action":"deploy"}`)
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/deploy-revision?revisionId="+revisionId, "-k")
+
+	cmd.Stdin = strings.NewReader(string(payload))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("deploy revision curl error: %v, output: %s", err, output)
+	}
+
+	outStr := string(output)
+	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
+}
