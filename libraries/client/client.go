@@ -204,7 +204,7 @@ func DeleteOldestRevision(apiId string, revisionId string){
 }
 
 
-func CreateRevision(apiId string) {
+func CreateRevision(apiId string) string{
 	payload := []byte(`{}`)
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
 		"-X", "POST",
@@ -231,10 +231,6 @@ func CreateRevision(apiId string) {
 	}
 
 	body := strings.TrimSpace(outStr[:idx])
-	if body == "" {
-		fmt.Println("Revision created successfully")
-		return
-	}
 
 	var data map[string]any
 	if err := json.Unmarshal([]byte(body), &data); err != nil {
@@ -242,9 +238,10 @@ func CreateRevision(apiId string) {
 	}
 
 	if revisionID, ok := data["id"].(string); ok {
-		fmt.Println("Created new revision with ID:", revisionID)
-		return
+		return revisionID
 	}
 
-	fmt.Println("Created new revision successfully")
+	return ""
+
 }
+
