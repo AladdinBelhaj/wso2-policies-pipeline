@@ -171,30 +171,31 @@ func PutApiUpdate(apiId string, payload []byte) error {
 }
 
 
-func ReviewRevisionsNumber(apiId string) bool, string {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+ "/apis/" + apiId + "/revisions", "-k")
+func ReviewRevisionsNumber(apiId string) (string, bool) {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	var data map[string]any
 
-	json.Unmarshal(jsonObject, &data)
+	if err := json.Unmarshal(jsonObject, &data); err != nil {
+		log.Fatal(err)
+	}
 
 	count := data["count"].(float64)
 
 	if count == 5 {
 		list := data["list"].([]interface{})
-		return list[0].(map[string]interface{})["id"], true
-	} else{
-		return "", false
+		return list[0].(map[string]interface{})["id"].(string), true
 	}
 
+	return "", false
 }
 
 
-func deleteOldestRevision(apiId string, revisionId string){
+func DeleteOldestRevision(apiId string, revisionId string){
 	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "DELETE", vars.BaseUrl+ "/apis/" + apiId + "/revisions/" + revisionId, "-k")
 	_, err := cmd.Output()
 	if err != nil {
@@ -203,10 +204,47 @@ func deleteOldestRevision(apiId string, revisionId string){
 }
 
 
-func createRevision(apiId string){
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, "-X", "POST", vars.BaseUrl+ "/apis/" + apiId + "/revisions", "-k")
-	_, err := cmd.Output()
+func CreateRevision(apiId string) {
+	payload := []byte(`{}`)
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+		"-X", "POST",
+		vars.BaseUrl+"/apis/"+apiId+"/revisions",
+		"-H", "Content-Type: application/json",
+		"-d", string(payload),
+		"-k",
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("create revision curl error: %v, output: %s", err, out)
 	}
+
+	outStr := string(out)
+	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
+	if idx == -1 {
+		log.Fatalf("create revision: no status code in output: %s", outStr)
+	}
+
+	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
+	if !strings.HasPrefix(statusCode, "2") {
+		log.Fatalf("create revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+	}
+
+	body := strings.TrimSpace(outStr[:idx])
+	if body == "" {
+		fmt.Println("Revision created successfully")
+		return
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		log.Fatalf("create revision response parse error: %v, body: %s", err, body)
+	}
+
+	if revisionID, ok := data["id"].(string); ok {
+		fmt.Println("Created new revision with ID:", revisionID)
+		return
+	}
+
+	fmt.Println("Created new revision successfully")
 }
