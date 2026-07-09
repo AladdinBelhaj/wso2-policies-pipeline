@@ -123,39 +123,22 @@ func ExtractOperationPolicies() []map[string]interface{} {
 		log.Fatal(err)
 	}
 
-	commonList := commonData["list"].([]interface{})
-	allPolicies := make([]map[string]interface{}, 0, len(commonList))
+	commonList, ok := commonData["list"].([]interface{})
+	if !ok {
+		return nil
+	}
 
+	allPolicies := make([]map[string]interface{}, 0, len(commonList))
 	for _, item := range commonList {
-		policy := item.(map[string]interface{})
+		policy, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		allPolicies = append(allPolicies, map[string]interface{}{
 			"id":      policy["id"],
 			"name":    policy["name"],
 			"version": policy["version"],
 		})
-	}
-
-	apiIds := ExtractApiIds()
-	for _, apiId := range apiIds {
-		apiJsonObject := getApiOperationPoliciesJsonObject(apiId)
-		var apiData map[string]any
-		if err := json.Unmarshal(apiJsonObject, &apiData); err != nil {
-			log.Fatal(err)
-		}
-
-		apiList, ok := apiData["list"].([]interface{})
-		if !ok {
-			continue
-		}
-
-		for _, item := range apiList {
-			policy := item.(map[string]interface{})
-			allPolicies = append(allPolicies, map[string]interface{}{
-				"id":      policy["id"],
-				"name":    policy["name"],
-				"version": policy["version"],
-			})
-		}
 	}
 
 	return allPolicies

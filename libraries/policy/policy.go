@@ -54,6 +54,12 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 			log.Fatal(err)
 		}
 
+		lifecycleStatus, _ := apiDetail["lifeCycleStatus"].(string)
+		if lifecycleStatus != "PUBLISHED" {
+			log.Printf("skipping API %s because lifecycle status is %s", apiId, lifecycleStatus)
+			continue
+		}
+
 		modified := false
 		lookupPolicies := buildPolicyLookupForApi(apiDetail, allPolicies)
 
