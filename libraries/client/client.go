@@ -107,8 +107,8 @@ func getOperationPoliciesJsonObject() []byte {
 	return jsonObject
 }
 
-func getApiOperationPoliciesJsonObject(apiId string) []byte {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/operation-policies", "-k")
+func getApiLevelPoliciesJsonObject(apiId string) []byte {
+	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/policies", "-k")
 	jsonObject, err := cmd.Output()
 	if err != nil {
 		log.Fatal(err)
@@ -137,7 +137,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 
 	apiIds := ExtractApiIds()
 	for _, apiId := range apiIds {
-		apiJsonObject := getApiOperationPoliciesJsonObject(apiId)
+		apiJsonObject := getApiLevelPoliciesJsonObject(apiId)
 		var apiData map[string]any
 		if err := json.Unmarshal(apiJsonObject, &apiData); err != nil {
 			log.Fatal(err)
