@@ -1,8 +1,8 @@
 package main
 
 import (
-	"wso2/scripts/internal/client"
-	"wso2/scripts/internal/policy"
+	"wso2/scripts/libraries/client"
+	"wso2/scripts/libraries/policy"
 	"wso2/scripts/vars"
 )
 
