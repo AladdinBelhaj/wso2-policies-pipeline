@@ -51,7 +51,10 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 		}
 		if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
 			log.Printf("failed to update API %s: %v", apiId, err)
+			continue
 		}
+
+		client.PrepareAndDeployRevision(apiId)
 	}
 }
 

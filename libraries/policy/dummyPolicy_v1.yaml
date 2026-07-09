@@ -1,0 +1,11 @@
+type: operation_policy
+name: dummyPolicy
+version: v1
+description: Dummy policy for testing revision deployment flow
+supportedGateways:
+  - Synapse
+supportedApiTypes:
+  - HTTP
+definition:
+  template: dummyPolicy_v1.j2
+  parameters: []
