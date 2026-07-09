@@ -8,6 +8,7 @@ import (
 )
 
 // This function fetches each API, resolves policy IDs by name, and PUTs the result back.
+// This function fetches each API, resolves policy IDs by name, and PUTs the result back.
 func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]interface{}) {
 	for _, apiEntry := range apiPolicies {
 		apiId := apiEntry["apiId"].(string)
@@ -22,8 +23,12 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 
 		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 		if ok {
+			apiScopedPolicies := append(
+				append([]map[string]interface{}{}, allPolicies...),
+				client.ExtractApiLevelPolicies(apiId)...,
+			)
 			for _, flow := range []string{"request", "response", "fault"} {
-				if resolvePoliciesInFlow(apiPoliciesBlock, flow, allPolicies) {
+				if resolvePoliciesInFlow(apiPoliciesBlock, flow, apiScopedPolicies) {
 					modified = true
 				}
 			}
