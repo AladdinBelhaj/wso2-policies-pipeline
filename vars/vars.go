@@ -11,6 +11,7 @@ import (
 var BaseUrl string
 var Username string
 var Password string
+var Endpoint string
 
 func Load() {
 //	Open the .env file
@@ -41,4 +42,5 @@ log.Fatal(err)
 BaseUrl = os.Getenv("BASE_URL")
 Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
+Endpoint = os.Getenv("Endpoint")
 }
