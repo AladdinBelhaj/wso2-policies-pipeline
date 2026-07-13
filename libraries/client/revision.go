@@ -11,7 +11,6 @@ import (
 
 const (
 	PathRevision = "/revisions/"
-	EndpointAPI = "/apis/" 
 )
 
 // This function verifies if the revisions number has reached 5 or not.
