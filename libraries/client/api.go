@@ -155,10 +155,10 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	cmd := newCurlCmd(
 		"-X", "PUT",
 		vars.BaseURL+vars.EndpointAPI+apiId,
-		"-H", "Content-Type: application/json",
+		"-H", contentTypeJSON,
 		"-d", "@-",
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	cmd.Stdin = strings.NewReader(string(payload))
 

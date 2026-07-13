@@ -13,6 +13,11 @@ type ApiSummary struct {
 	Name string
 }
 
+const (
+	contentTypeJSON  = "Content-Type: application/json"
+	httpStatusFormat = "\nHTTP_STATUS:%{http_code}"
+)
+
 // This function creates a new exec.Cmd for a curl command with the provided arguments to interact with WSO2 API Manager.
 func newCurlCmd(args ...string) *exec.Cmd {
 	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)

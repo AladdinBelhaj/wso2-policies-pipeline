@@ -66,9 +66,9 @@ func UndeployRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+vars.EndpointAPI+apiId+"/undeploy-revision?revisionId="+revisionId,
-		"-H", "Content-Type: application/json",
+		"-H", contentTypeJSON,
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -94,7 +94,7 @@ func DeleteRevision(apiId string, revisionId string) error {
 		"-X", "DELETE",
 		vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision+revisionId,
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -119,10 +119,10 @@ func CreateRevision(apiId string) string {
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision,
-		"-H", "Content-Type: application/json",
+		"-H", contentTypeJSON,
 		"-d", string(payload),
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -162,10 +162,10 @@ func DeployRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+vars.EndpointAPI+apiId+"/deploy-revision?revisionId="+revisionId,
-		"-H", "Content-Type: application/json",
+		"-H", contentTypeJSON,
 		"-d", payload,
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -190,9 +190,9 @@ func RestoreRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+vars.EndpointAPI+apiId+"/restore-revision?revisionId="+revisionId,
-		"-H", "Content-Type: application/json",
+		"-H", contentTypeJSON,
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", httpStatusFormat)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
