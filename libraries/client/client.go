@@ -17,11 +17,48 @@ type ApiSummary struct {
 	Name string
 }
 
+func newCurlCmd(args ...string) *exec.Cmd {
+	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)
+	return exec.Command("curl", curlArgs...)
+}
+
+func parseCurlStatus(output []byte, action string) (string, string, error) {
+	outStr := string(output)
+	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
+	if idx == -1 {
+		return "", "", fmt.Errorf("%s: no status code in output: %s", action, strings.TrimSpace(outStr))
+	}
+
+	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
+	body := strings.TrimSpace(outStr[:idx])
+	return statusCode, body, nil
+}
+
+func normalizePolicyList(data map[string]any) []map[string]interface{} {
+	list, ok := data["list"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	policies := make([]map[string]interface{}, 0, len(list))
+	for _, item := range list {
+		policy, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		policies = append(policies, map[string]interface{}{
+			"id":      policy["id"],
+			"name":    policy["name"],
+			"version": policy["version"],
+		})
+	}
+
+	return policies
+}
+
 // This function executes a curl command to fetch the JSON object from the /apis endpoint
 func getApiJsonObject() []byte {
-
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis", "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -132,9 +169,7 @@ func ConfirmAction(preview string) bool {
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint
 func GetApiDetailsJsonObject(apiId string) []byte {
-
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId, "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -181,8 +216,7 @@ func ExtractApiPolicies(apiIds []string) []map[string]any {
 }
 
 func getOperationPoliciesJsonObject() []byte {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/operation-policies", "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/operation-policies", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -197,24 +231,11 @@ func ExtractOperationPolicies() []map[string]interface{} {
 		log.Fatal(err)
 	}
 
-	list := data["list"].([]interface{})
-	allPolicies := make([]map[string]interface{}, 0, len(list))
-
-	for _, item := range list {
-		policy := item.(map[string]interface{})
-		allPolicies = append(allPolicies, map[string]interface{}{
-			"id":      policy["id"],
-			"name":    policy["name"],
-			"version": policy["version"],
-		})
-	}
-
-	return allPolicies
+	return normalizePolicyList(data)
 }
 
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/operation-policies", "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/operation-policies", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -230,27 +251,12 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 		log.Fatal(err)
 	}
 
-	list, ok := data["list"].([]interface{})
-	if !ok {
-		return nil
-	}
-
-	policies := make([]map[string]interface{}, 0, len(list))
-	for _, item := range list {
-		policy := item.(map[string]interface{})
-		policies = append(policies, map[string]interface{}{
-			"id":      policy["id"],
-			"name":    policy["name"],
-			"version": policy["version"],
-		})
-	}
-
-	return policies
+	return normalizePolicyList(data)
 }
 
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
 func PutApiUpdate(apiId string, payload []byte) error {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+	cmd := newCurlCmd(
 		"-X", "PUT",
 		vars.BaseUrl+"/apis/"+apiId,
 		"-H", "Content-Type: application/json",
@@ -265,26 +271,21 @@ func PutApiUpdate(apiId string, payload []byte) error {
 		return fmt.Errorf("PUT /apis/%s curl error: %v, output: %s", apiId, err, output)
 	}
 
-	outStr := string(output)
-	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
-	if idx == -1 {
-		return fmt.Errorf("PUT /apis/%s: no status code in output: %s", apiId, outStr)
+	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("PUT /apis/%s", apiId))
+	if err != nil {
+		return err
 	}
-
-	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
 	if strings.HasPrefix(statusCode, "2") {
 		fmt.Printf("PUT /apis/%s: OK (HTTP %s)\n", apiId, statusCode)
 		return nil
 	}
 
-	body := strings.TrimSpace(outStr[:idx])
 	fmt.Printf("PUT /apis/%s: FAILED (HTTP %s) - %s\n", apiId, statusCode, body)
 	return fmt.Errorf("HTTP %s", statusCode)
 }
 
 func ReviewRevisionsNumber(apiId string) (string, bool) {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -306,8 +307,7 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 }
 
 func GetRevisionIds(apiId string) ([]string, error) {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password, vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k")
-	jsonObject, err := cmd.Output()
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func RollbackApiRevision(apiId string) error {
 }
 
 func DeleteOldestRevision(apiId string, revisionId string) {
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+	cmd := newCurlCmd(
 		"-X", "DELETE",
 		vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId,
 		"-k",
@@ -382,15 +382,12 @@ func DeleteOldestRevision(apiId string, revisionId string) {
 		log.Fatalf("delete revision curl error: %v, output: %s", err, out)
 	}
 
-	outStr := string(out)
-	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
-	if idx == -1 {
-		log.Fatalf("delete revision: no status code in output: %s", outStr)
+	statusCode, body, err := parseCurlStatus(out, fmt.Sprintf("delete revision %s", revisionId))
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
 	if !strings.HasPrefix(statusCode, "2") {
-		log.Fatalf("delete revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+		log.Fatalf("delete revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Printf("Deleted revision %s successfully\n", revisionId)
@@ -398,7 +395,7 @@ func DeleteOldestRevision(apiId string, revisionId string) {
 
 func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseUrl+"/apis/"+apiId+"/revisions",
 		"-H", "Content-Type: application/json",
@@ -411,18 +408,14 @@ func CreateRevision(apiId string) string {
 		log.Fatalf("create revision curl error: %v, output: %s", err, out)
 	}
 
-	outStr := string(out)
-	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
-	if idx == -1 {
-		log.Fatalf("create revision: no status code in output: %s", outStr)
+	statusCode, body, err := parseCurlStatus(out, fmt.Sprintf("create revision for API %s", apiId))
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
 	if !strings.HasPrefix(statusCode, "2") {
-		log.Fatalf("create revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+		log.Fatalf("create revision failed with HTTP %s: %s", statusCode, body)
 	}
 
-	body := strings.TrimSpace(outStr[:idx])
 	var data map[string]any
 	if err := json.Unmarshal([]byte(body), &data); err != nil {
 		log.Fatalf("create revision response parse error: %v, body: %s", err, body)
@@ -444,7 +437,7 @@ func DeployRevision(apiId string, revisionId string) error {
 		}
 	]`
 
-	cmd := exec.Command("curl", "-u", vars.Username+":"+vars.Password,
+	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseUrl+"/apis/"+apiId+"/deploy-revision?revisionId="+revisionId,
 		"-H", "Content-Type: application/json",
@@ -457,15 +450,12 @@ func DeployRevision(apiId string, revisionId string) error {
 		return fmt.Errorf("deploy revision curl error: %v, output: %s", err, output)
 	}
 
-	outStr := string(output)
-	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
-	if idx == -1 {
-		return fmt.Errorf("deploy revision: no status code in output: %s", outStr)
+	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("deploy revision %s", revisionId))
+	if err != nil {
+		return err
 	}
-
-	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
 	if !strings.HasPrefix(statusCode, "2") {
-		return fmt.Errorf("deploy revision failed with HTTP %s: %s", statusCode, strings.TrimSpace(outStr[:idx]))
+		return fmt.Errorf("deploy revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Println("Revision deployed successfully")

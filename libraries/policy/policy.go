@@ -7,7 +7,8 @@ import (
 	"wso2/scripts/libraries/client"
 )
 
-// This function fetches each API, resolves policy IDs by name, and PUTs the result back.
+var policyFlows = []string{"request", "response", "fault"}
+
 // This function fetches each API, resolves policy IDs by name, and PUTs the result back.
 func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]interface{}) {
 	for _, apiEntry := range apiPolicies {
@@ -28,7 +29,7 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 
 		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 		if ok {
-			for _, flow := range []string{"request", "response", "fault"} {
+			for _, flow := range policyFlows {
 				if resolvePoliciesInFlow(apiPoliciesBlock, flow, apiScopedPolicies) {
 					modified = true
 				}
@@ -50,7 +51,7 @@ func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]in
 			if !ok {
 				continue
 			}
-			for _, flow := range []string{"request", "response", "fault"} {
+			for _, flow := range policyFlows {
 				if resolvePoliciesInFlow(opPolicies, flow, apiScopedPolicies) {
 					modified = true
 				}
