@@ -13,6 +13,7 @@ var Username string
 var Password string
 var EndpointAPI string
 var PathRevision string
+var CurlStatusFormat string
 
 func Load() {
 //	Open the .env file
@@ -45,5 +46,6 @@ Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
 EndpointAPI = os.Getenv("API_ENDPOINT")
 PathRevision = os.Getenv("PATH_REVISION")
+CurlStatusFormat = os.Getenv("CURL_STATUS_FORMAT")
 
 }

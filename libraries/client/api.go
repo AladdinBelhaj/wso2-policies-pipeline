@@ -158,7 +158,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 		"-H", "Content-Type: application/json",
 		"-d", "@-",
 		"-k",
-		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+		"-s", "-w", vars.CurlStatusFormat)
 
 	cmd.Stdin = strings.NewReader(string(payload))
 
