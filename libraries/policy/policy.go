@@ -15,66 +15,80 @@ var policyFlows = []string{"request", "response", "fault"}
 func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]interface{}) {
 	for _, apiEntry := range apiPolicies {
 		apiId := apiEntry["apiId"].(string)
+		processSingleApi(apiId, allPolicies)
+	}
+}
 
-		// Fetch the full API object, will be mutated then PUT back
-		var apiDetail map[string]any
-		if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
-			log.Fatal(err)
+func processSingleApi(apiId string, allPolicies []map[string]interface{}) {
+	var apiDetail map[string]any
+	if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
+		log.Fatal(err)
+	}
+
+	apiScopedPolicies := append(
+		append([]map[string]interface{}{}, allPolicies...),
+		client.ExtractApiLevelPolicies(apiId)...,
+	)
+
+	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies)
+	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies) {
+		modified = true
+	}
+
+	if !modified {
+		return
+	}
+
+	updatedJson, err := json.Marshal(apiDetail)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
+		log.Printf("failed to update API %s: %v", apiId, err)
+		return
+	}
+
+	client.PrepareAndDeployRevision(apiId)
+}
+
+func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}) bool {
+	apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	modified := false
+	for _, flow := range policyFlows {
+		if resolvePoliciesInFlow(apiPoliciesBlock, flow, policies) {
+			modified = true
 		}
+	}
+	return modified
+}
 
-		modified := false
+func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}) bool {
+	operations, ok := apiDetail["operations"].([]interface{})
+	if !ok {
+		return false
+	}
 
-		apiScopedPolicies := append(
-			append([]map[string]interface{}{}, allPolicies...),
-			client.ExtractApiLevelPolicies(apiId)...,
-		)
-
-		apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
-		if ok {
-			for _, flow := range policyFlows {
-				if resolvePoliciesInFlow(apiPoliciesBlock, flow, apiScopedPolicies) {
-					modified = true
-				}
-			}
-		}
-
-		operations, ok := apiDetail["operations"].([]interface{})
+	modified := false
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-
-		// Walk every operation and resolve policy IDs in each flow.
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			for _, flow := range policyFlows {
-				if resolvePoliciesInFlow(opPolicies, flow, apiScopedPolicies) {
-					modified = true
-				}
-			}
-		}
-
-		if !modified {
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
 			continue
 		}
-
-		updatedJson, err := json.Marshal(apiDetail)
-		if err != nil {
-			log.Fatal(err)
+		for _, flow := range policyFlows {
+			if resolvePoliciesInFlow(opPolicies, flow, policies) {
+				modified = true
+			}
 		}
-		if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
-			log.Printf("failed to update API %s: %v", apiId, err)
-			continue
-		}
-
-		client.PrepareAndDeployRevision(apiId)
 	}
+	return modified
 }
 
 // This function matches each policy in a single flow (request for example) by name
