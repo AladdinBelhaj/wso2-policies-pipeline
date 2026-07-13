@@ -42,5 +42,5 @@ log.Fatal(err)
 BaseUrl = os.Getenv("BASE_URL")
 Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
-Endpoint = os.Getenv("Endpoint")
+Endpoint = os.Getenv("ENDPOINT")
 }
