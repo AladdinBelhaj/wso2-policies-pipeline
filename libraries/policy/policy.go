@@ -4,6 +4,8 @@ package policy
 import (
 	"encoding/json"
 	"log"
+	"strconv"
+	"strings"
 	"wso2/scripts/libraries/client"
 )
 
@@ -108,16 +110,25 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (string, string, bool) {
 	latestId := ""
 	latestVersion := ""
+	latestNumber := -1
 
 	for _, policy := range allPolicies {
 		if policy["name"] != name {
 			continue
 		}
+
 		version, ok := policy["version"].(string)
 		if !ok {
 			continue
 		}
-		if version > latestVersion {
+
+		num, err := strconv.Atoi(strings.TrimPrefix(version, "v"))
+		if err != nil {
+			continue
+		}
+
+		if num > latestNumber {
+			latestNumber = num
 			latestVersion = version
 			latestId, _ = policy["id"].(string)
 		}
@@ -126,5 +137,6 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 	if latestId == "" {
 		return "", "", false
 	}
+
 	return latestId, latestVersion, true
 }
