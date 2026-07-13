@@ -30,7 +30,7 @@ func main() {
 		apiSummaries := client.ExtractApiSummaries()
 		apiIds := client.FilterApiIdsByName(apiSummaries, target)
 		if len(apiIds) == 0 {
-			log.Printf("no APIs matched rollback target %q", target)
+			log.Printf("API %q does not exist", target)
 			return
 		}
 
