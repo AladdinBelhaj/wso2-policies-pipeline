@@ -17,11 +17,13 @@ type ApiSummary struct {
 	Name string
 }
 
+// This function creates a new exec.Cmd for a curl command with the provided arguments to interact with WSO2 API Manager
 func newCurlCmd(args ...string) *exec.Cmd {
 	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)
 	return exec.Command("curl", curlArgs...)
 }
 
+// This function parses the output of a curl command to extract the HTTP status code and response body.
 func parseCurlStatus(output []byte, action string) (string, string, error) {
 	outStr := string(output)
 	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
@@ -33,6 +35,7 @@ func parseCurlStatus(output []byte, action string) (string, string, error) {
 	body := strings.TrimSpace(outStr[:idx])
 	return statusCode, body, nil
 }
+
 
 func normalizePolicyList(data map[string]any) []map[string]interface{} {
 	list, ok := data["list"].([]interface{})
@@ -153,6 +156,7 @@ func BuildRollbackPreview(apiIDs []string, target string) string {
 	return strings.Join(preview, "\n")
 }
 
+// This function prompts the user for confirmation before proceeding with an action.
 func ConfirmAction(preview string) bool {
 	fmt.Println(preview)
 	fmt.Print("Proceed? [y/N]: ")
@@ -215,6 +219,7 @@ func ExtractApiPolicies(apiIds []string) []map[string]any {
 
 }
 
+// This function fetches all common operation policies
 func getOperationPoliciesJsonObject() []byte {
 	jsonObject, err := newCurlCmd(vars.BaseUrl+"/operation-policies", "-k").Output()
 	if err != nil {
@@ -223,6 +228,7 @@ func getOperationPoliciesJsonObject() []byte {
 	return jsonObject
 }
 
+// This function extracts the policies and the metadata from the JSON objects
 func ExtractOperationPolicies() []map[string]interface{} {
 	jsonObject := getOperationPoliciesJsonObject()
 
@@ -234,6 +240,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 	return normalizePolicyList(data)
 }
 
+// This function fetches API level policies
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
 	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/operation-policies", "-k").Output()
 	if err != nil {
@@ -284,6 +291,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	return fmt.Errorf("HTTP %s", statusCode)
 }
 
+// This function verifies if the revisions number has reached 5 or not
 func ReviewRevisionsNumber(apiId string) (string, bool) {
 	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k").Output()
 	if err != nil {
@@ -306,6 +314,7 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 	return "", false
 }
 
+// This function fetches the ID of each revision
 func GetRevisionIds(apiId string) ([]string, error) {
 	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions", "-k").Output()
 	if err != nil {
@@ -336,6 +345,7 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
+// This function rolls back to the previous revision
 func RollbackApiRevision(apiId string) error {
 	revisionIDs, err := GetRevisionIds(apiId)
 	if err != nil {
@@ -370,6 +380,7 @@ func RollbackApiRevision(apiId string) error {
 	return nil
 }
 
+// This function deletes the oldest revision (before rolling back)
 func DeleteOldestRevision(apiId string, revisionId string) {
 	cmd := newCurlCmd(
 		"-X", "DELETE",
@@ -393,6 +404,7 @@ func DeleteOldestRevision(apiId string, revisionId string) {
 	fmt.Printf("Deleted revision %s successfully\n", revisionId)
 }
 
+// This function creates a revision
 func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
 	cmd := newCurlCmd(
@@ -428,6 +440,8 @@ func CreateRevision(apiId string) string {
 	return ""
 }
 
+// This function deploys a revision
+
 func DeployRevision(apiId string, revisionId string) error {
 	payload := `[
 		{
@@ -462,6 +476,7 @@ func DeployRevision(apiId string, revisionId string) error {
 	return nil
 }
 
+// This function deletes the oldest revision (if number of revisions == 5), creates and deploys a new revision
 func PrepareAndDeployRevision(apiId string) {
 	if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
 		fmt.Printf("Found 5 revisions; deleting oldest revision %s\n", oldestRevision)
