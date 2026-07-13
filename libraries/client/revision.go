@@ -68,7 +68,7 @@ func UndeployRevision(apiId string, revisionId string) error {
 		vars.BaseURL+vars.EndpointAPI+apiId+"/undeploy-revision?revisionId="+revisionId,
 		"-H", "Content-Type: application/json",
 		"-k",
-		"-s", "-w", vars.CurlStatusFormat)
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -94,7 +94,7 @@ func DeleteRevision(apiId string, revisionId string) error {
 		"-X", "DELETE",
 		vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision+revisionId,
 		"-k",
-		"-s", "-w", vars.CurlStatusFormat)
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -122,7 +122,7 @@ func CreateRevision(apiId string) string {
 		"-H", "Content-Type: application/json",
 		"-d", string(payload),
 		"-k",
-		"-s", "-w", vars.CurlStatusFormat)
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -165,7 +165,7 @@ func DeployRevision(apiId string, revisionId string) error {
 		"-H", "Content-Type: application/json",
 		"-d", payload,
 		"-k",
-		"-s", "-w", vars.CurlStatusFormat)
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -192,7 +192,7 @@ func RestoreRevision(apiId string, revisionId string) error {
 		vars.BaseURL+vars.EndpointAPI+apiId+"/restore-revision?revisionId="+revisionId,
 		"-H", "Content-Type: application/json",
 		"-k",
-		"-s", "-w", vars.CurlStatusFormat)
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -214,13 +214,8 @@ func RestoreRevision(apiId string, revisionId string) error {
 // This function deletes the oldest revision (if number of revisions == 5), creates and deploys a new revision.
 func PrepareAndDeployRevision(apiId string) {
 	if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
-		fmt.Printf("Found 5 revisions; undeploying and deleting oldest revision %s\n", oldestRevision)
-		if err := UndeployRevision(apiId, oldestRevision); err != nil {
-			log.Printf("Warning: failed to undeploy oldest revision: %v", err)
-		}
-		if err := DeleteRevision(apiId, oldestRevision); err != nil {
-			log.Fatalf("failed to delete oldest revision: %v", err)
-		}
+		fmt.Printf("Found 5 revisions; deleting oldest revision %s\n", oldestRevision)
+		DeleteRevision(apiId, oldestRevision)
 	}
 
 	newRevisionID := CreateRevision(apiId)

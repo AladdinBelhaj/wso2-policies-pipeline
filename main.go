@@ -12,65 +12,62 @@ import (
 func main() {
 	vars.Load()
 
-	dryRun := false
-	target := ""
-	if len(os.Args) > 1 {
-		for _, arg := range os.Args[1:] {
-			switch arg {
-			case "--dry-run", "-n":
-				dryRun = true
-			default:
-				if arg == "rollback" {
-					continue
-				}
-				if target == "" {
-					target = arg
-				} else {
-					target += " " + arg
-				}
-			}
-		}
-	}
+	dryRun, isRollback, target := parseArguments()
 
+	if isRollback {
+		executeRollback(target, dryRun)
+	} else {
+		executeUpdatePolicies(target, dryRun)
+	}
+}
+
+func parseArguments() (dryRun bool, isRollback bool, target string) {
 	if len(os.Args) > 1 && os.Args[1] == "rollback" {
-		if len(os.Args) > 2 {
-			target = strings.Join(os.Args[2:], " ")
-		}
+		isRollback = true
+	}
 
-		apiSummaries := client.ExtractApiSummaries()
-		apiIds := client.FilterApiIdsByName(apiSummaries, target)
-		if len(apiIds) == 0 {
-			log.Printf("API %q does not exist", target)
-			return
+	var targetParts []string
+	for _, arg := range os.Args[1:] {
+		if arg == "--dry-run" || arg == "-n" {
+			dryRun = true
+			continue
 		}
-
-		preview := client.BuildRollbackPreview(apiIds, target)
-		if dryRun || !client.ConfirmAction(preview) {
-			if dryRun {
-				log.Println("dry run: no changes were applied")
-			} else {
-				log.Println("operation cancelled")
-			}
-			return
+		if arg == "rollback" && isRollback {
+			continue
 		}
+		targetParts = append(targetParts, arg)
+	}
+	return dryRun, isRollback, strings.Join(targetParts, " ")
+}
 
-		for _, apiId := range apiIds {
-			if err := client.RollbackApiRevision(apiId); err != nil {
-				log.Printf("rollback failed for API %s: %v", apiId, err)
-			}
+func executeRollback(target string, dryRun bool) {
+	apiIds := fetchApiIds(target, true)
+	if len(apiIds) == 0 {
+		return
+	}
+
+	preview := client.BuildRollbackPreview(apiIds, target)
+	if dryRun || !client.ConfirmAction(preview) {
+		if dryRun {
+			log.Println("dry run: no changes were applied")
+		} else {
+			log.Println("operation cancelled")
 		}
 		return
 	}
 
-	apiSummaries := client.ExtractApiSummaries()
-	apiIds := client.FilterApiIdsByName(apiSummaries, target)
+	for _, apiId := range apiIds {
+		if err := client.RollbackApiRevision(apiId); err != nil {
+			log.Printf("rollback failed for API %s: %v", apiId, err)
+		}
+	}
+}
+
+func executeUpdatePolicies(target string, dryRun bool) {
+	apiIds := fetchApiIds(target, false)
 	if len(apiIds) == 0 && target != "" {
-		log.Printf("API %q does not exist", target)
 		return
 	}
-
-	apiPolicies := client.ExtractApiPolicies(apiIds)
-	allPolicies := client.ExtractOperationPolicies()
 
 	if dryRun {
 		preview := "Dry run: policy updates for the following APIs will be applied:\n"
@@ -83,5 +80,20 @@ func main() {
 		}
 	}
 
+	apiPolicies := client.ExtractApiPolicies(apiIds)
+	allPolicies := client.ExtractOperationPolicies()
 	policy.UpdateApiPolicies(apiPolicies, allPolicies)
+}
+
+func fetchApiIds(target string, isRollback bool) []string {
+	apiSummaries := client.ExtractApiSummaries()
+	apiIds := client.FilterApiIdsByName(apiSummaries, target)
+	
+	if len(apiIds) == 0 {
+		if isRollback || target != "" {
+			log.Printf("API %q does not exist", target)
+		}
+	}
+	
+	return apiIds
 }
