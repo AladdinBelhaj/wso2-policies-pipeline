@@ -12,7 +12,6 @@ var BaseURL string
 var Username string
 var Password string
 var EndpointAPI string
-var PathRevision string
 
 func Load() {
 //	Open the .env file
@@ -44,6 +43,5 @@ BaseURL = os.Getenv("BASE_URL")
 Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
 EndpointAPI = os.Getenv("API_ENDPOINT")
-PathRevision = os.Getenv("PATH_REVISION")
 
 }

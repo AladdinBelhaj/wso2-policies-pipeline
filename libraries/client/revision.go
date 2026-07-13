@@ -8,9 +8,14 @@ import (
 	"wso2/scripts/vars"
 )
 
+
+const (
+	PathRevision  = "/revisions/"
+)
+
 // This function verifies if the revisions number has reached 5 or not.
 func ReviewRevisionsNumber(apiId string) (string, bool) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+PathRevision, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,7 +37,7 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 
 // This function fetches the ID of each revision.
 func GetRevisionIds(apiId string) ([]string, error) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+PathRevision, "-k").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +97,7 @@ func UndeployRevision(apiId string, revisionId string) error {
 func DeleteRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "DELETE",
-		vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision+revisionId,
+		vars.BaseURL+vars.EndpointAPI+apiId+PathRevision+revisionId,
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
@@ -118,7 +123,7 @@ func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+vars.EndpointAPI+apiId+vars.PathRevision,
+		vars.BaseURL+vars.EndpointAPI+apiId+PathRevision,
 		"-H", contentTypeJSON,
 		"-d", string(payload),
 		"-k",
