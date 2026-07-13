@@ -20,7 +20,8 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 		log.Fatal(err)
 	}
 
-	count := data["count"].(float64)
+	count := data["count"].(int)
+	fmt.Println(count)
 	if count == 5 {
 		list := data["list"].([]interface{})
 		return list[0].(map[string]interface{})["id"].(string), true
@@ -60,17 +61,35 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
-// This function fetches the full API payload for a specific revision.
-func GetRevisionDetailsJsonObject(apiId string, revisionId string) ([]byte, error) {
-	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId, "-k").Output()
+// This function undeploys a revision before deleting it
+func UndeployRevision(apiId string, revisionId string) error {
+	cmd := newCurlCmd(
+		"-X", "POST",
+		vars.BaseUrl+"/apis/"+apiId+"/undeploy-revision?revisionId="+revisionId,
+		"-H", "Content-Type: application/json",
+		"-k",
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("undeploy revision curl error: %v, output: %s", err, output)
 	}
-	return jsonObject, nil
+
+	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("undeploy revision %s", revisionId))
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(statusCode, "2") {
+		return fmt.Errorf("undeploy revision failed with HTTP %s: %s", statusCode, body)
+	}
+
+	fmt.Printf("Undeployed revision %s successfully\n", revisionId)
+	return nil
 }
 
-// This function deletes the oldest revision (before rolling back).
-func DeleteOldestRevision(apiId string, revisionId string) {
+
+// This function deletes a revision without attempting to undeploy it first
+func DeleteRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "DELETE",
 		vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId,
@@ -79,18 +98,19 @@ func DeleteOldestRevision(apiId string, revisionId string) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("delete revision curl error: %v, output: %s", err, out)
+		return fmt.Errorf("delete revision curl error: %v, output: %s", err, out)
 	}
 
 	statusCode, body, err := parseCurlStatus(out, fmt.Sprintf("delete revision %s", revisionId))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if !strings.HasPrefix(statusCode, "2") {
-		log.Fatalf("delete revision failed with HTTP %s: %s", statusCode, body)
+		return fmt.Errorf("delete revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Printf("Deleted revision %s successfully\n", revisionId)
+	return nil
 }
 
 // This function creates a revision.
@@ -161,6 +181,33 @@ func DeployRevision(apiId string, revisionId string) error {
 	}
 
 	fmt.Println("Revision deployed successfully")
+	return nil
+}
+
+// This function restores a previous revision to the API.
+func RestoreRevision(apiId string, revisionId string) error {
+	
+	cmd := newCurlCmd(
+		"-X", "POST",
+		vars.BaseUrl+"/apis/"+apiId+"/restore-revision?revisionId="+revisionId,
+		"-H", "Content-Type: application/json",
+		"-k",
+		"-s", "-w", "\nHTTP_STATUS:%{http_code}")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("restore revision curl error: %v, output: %s", err, output)
+	}
+
+	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("restore revision %s", revisionId))
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(statusCode, "2") {
+		return fmt.Errorf("restore revision failed with HTTP %s: %s", statusCode, body)
+	}
+
+	fmt.Println("Revision restored successfully")
 	return nil
 }
 

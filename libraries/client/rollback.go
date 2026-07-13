@@ -87,25 +87,17 @@ func RollbackApiRevision(apiId string) error {
 	targetRevisionID := revisionIDs[len(revisionIDs)-2]
 	revisionToRemove := revisionIDs[len(revisionIDs)-1]
 
-	targetPayload, err := GetRevisionDetailsJsonObject(apiId, targetRevisionID)
-	if err != nil {
-		return fmt.Errorf("fetch rollback target revision details for API %s: %w", apiId, err)
-	}
-	if err := PutApiUpdate(apiId, targetPayload); err != nil {
+	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
+	if err := RestoreRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("restore rollback target for API %s: %w", apiId, err)
 	}
 
-	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
-	if err := DeployRevision(apiId, targetRevisionID); err != nil {
-		return fmt.Errorf("deploy rollback target for API %s: %w", apiId, err)
-	}
-
-	if len(revisionIDs) > 2 {
-		fmt.Printf("Deleting revision %s for API %s\n", revisionToRemove, apiId)
-		DeleteOldestRevision(apiId, revisionToRemove)
-	} else {
-		fmt.Printf("Skipping revision deletion for API %s because there are only 2 revisions\n", apiId)
-	}
+if len(revisionIDs) > 2 {
+    fmt.Printf("Deleting revision %s for API %s\n", revisionToRemove, apiId)
+    if err := DeleteRevision(apiId, revisionToRemove); err != nil {
+        return fmt.Errorf("delete stale revision for API %s: %w", apiId, err)
+    }
+}
 
 	return nil
 }
