@@ -8,7 +8,7 @@ import (
 "strings"
 )
 
-var BaseUrl string
+var BaseURL string
 var Username string
 var Password string
 var Endpoint string
@@ -39,8 +39,10 @@ if err := scanner.Err(); err !=  nil {
 log.Fatal(err)
 }
 // assign the environment variable using the os.Getenv method
-BaseUrl = os.Getenv("BASE_URL")
+BaseURL = os.Getenv("BASE_URL")
 Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
-Endpoint = os.Getenv("ENDPOINT")
+EndpointAPI = os.Getenv("ENDPOINT")
+PathRevision = os.Getenv("PATH_REVISION")
+
 }
