@@ -87,6 +87,14 @@ func RollbackApiRevision(apiId string) error {
 	targetRevisionID := revisionIDs[len(revisionIDs)-2]
 	revisionToRemove := revisionIDs[len(revisionIDs)-1]
 
+	targetPayload, err := GetRevisionDetailsJsonObject(apiId, targetRevisionID)
+	if err != nil {
+		return fmt.Errorf("fetch rollback target revision details for API %s: %w", apiId, err)
+	}
+	if err := PutApiUpdate(apiId, targetPayload); err != nil {
+		return fmt.Errorf("restore rollback target for API %s: %w", apiId, err)
+	}
+
 	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
 	if err := DeployRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("deploy rollback target for API %s: %w", apiId, err)

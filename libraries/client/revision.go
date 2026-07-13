@@ -60,6 +60,15 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
+// This function fetches the full API payload for a specific revision.
+func GetRevisionDetailsJsonObject(apiId string, revisionId string) ([]byte, error) {
+	jsonObject, err := newCurlCmd(vars.BaseUrl+"/apis/"+apiId+"/revisions/"+revisionId, "-k").Output()
+	if err != nil {
+		return nil, err
+	}
+	return jsonObject, nil
+}
+
 // This function deletes the oldest revision (before rolling back).
 func DeleteOldestRevision(apiId string, revisionId string) {
 	cmd := newCurlCmd(
