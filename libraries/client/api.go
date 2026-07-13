@@ -64,7 +64,7 @@ func ExtractApiIds() []string {
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint.
 func GetApiDetailsJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.Endpoint+apiId, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 
 // This function fetches API level policies.
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.Endpoint+apiId+"/operation-policies", "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+"/operation-policies", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 func PutApiUpdate(apiId string, payload []byte) error {
 	cmd := newCurlCmd(
 		"-X", "PUT",
-		vars.BaseURL+vars.Endpoint+apiId,
+		vars.BaseURL+vars.EndpointAPI+apiId,
 		"-H", "Content-Type: application/json",
 		"-d", "@-",
 		"-k",
