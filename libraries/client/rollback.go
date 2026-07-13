@@ -85,19 +85,28 @@ func RollbackApiRevision(apiId string) error {
 	}
 
 	targetRevisionID := revisionIDs[len(revisionIDs)-2]
-	revisionToRemove := revisionIDs[len(revisionIDs)-1]
 
 	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
 	if err := RestoreRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("restore rollback target for API %s: %w", apiId, err)
 	}
 
-if len(revisionIDs) > 2 {
-    fmt.Printf("Deleting revision %s for API %s\n", revisionToRemove, apiId)
-    if err := DeleteRevision(apiId, revisionToRemove); err != nil {
-        return fmt.Errorf("delete stale revision for API %s: %w", apiId, err)
-    }
-}
+	if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
+		fmt.Printf("Found 5 revisions; deleting oldest revision %s to make room for new revision\n", oldestRevision)
+		if err := DeleteRevision(apiId, oldestRevision); err != nil {
+			return fmt.Errorf("delete oldest revision for API %s: %w", apiId, err)
+		}
+	}
+
+	newRevisionID := CreateRevision(apiId)
+	if newRevisionID == "" {
+		return fmt.Errorf("failed to create a new revision for API %s", apiId)
+	}
+
+	fmt.Printf("Created new revision %s from restored state; deploying it\n", newRevisionID)
+	if err := DeployRevision(apiId, newRevisionID); err != nil {
+		return fmt.Errorf("deploy new revision for API %s: %w", apiId, err)
+	}
 
 	return nil
 }

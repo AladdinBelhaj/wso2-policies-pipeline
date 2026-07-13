@@ -20,8 +20,8 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 		log.Fatal(err)
 	}
 
-	count := data["count"].(int)
-	fmt.Println(count)
+	count := data["count"].(float64)
+
 	if count == 5 {
 		list := data["list"].([]interface{})
 		return list[0].(map[string]interface{})["id"].(string), true
@@ -215,7 +215,7 @@ func RestoreRevision(apiId string, revisionId string) error {
 func PrepareAndDeployRevision(apiId string) {
 	if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
 		fmt.Printf("Found 5 revisions; deleting oldest revision %s\n", oldestRevision)
-		DeleteOldestRevision(apiId, oldestRevision)
+		DeleteRevision(apiId, oldestRevision)
 	}
 
 	newRevisionID := CreateRevision(apiId)
