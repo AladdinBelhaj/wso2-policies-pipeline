@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// This function will filter each API ID by its name
 func FilterApiIdsByName(apis []ApiSummary, target string) []string {
 	target = strings.TrimSpace(target)
 	if target == "" || strings.EqualFold(target, "all") {
@@ -33,6 +34,8 @@ func FilterApiIdsByName(apis []ApiSummary, target string) []string {
 	return matchedIDs
 }
 
+
+// This function will provide the preview before rolling back
 func BuildRollbackPreview(apiIDs []string, target string) string {
 	targetLabel := "all APIs"
 	if strings.TrimSpace(target) != "" && !strings.EqualFold(target, "all") {
