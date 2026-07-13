@@ -13,16 +13,26 @@ func main() {
 	vars.Load()
 
 	dryRun := false
+	target := ""
 	if len(os.Args) > 1 {
 		for _, arg := range os.Args[1:] {
-			if arg == "--dry-run" || arg == "-n" {
+			switch arg {
+			case "--dry-run", "-n":
 				dryRun = true
+			default:
+				if arg == "rollback" {
+					continue
+				}
+				if target == "" {
+					target = arg
+				} else {
+					target += " " + arg
+				}
 			}
 		}
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "rollback" {
-		target := ""
 		if len(os.Args) > 2 {
 			target = strings.Join(os.Args[2:], " ")
 		}
@@ -52,7 +62,13 @@ func main() {
 		return
 	}
 
-	apiIds := client.ExtractApiIds()
+	apiSummaries := client.ExtractApiSummaries()
+	apiIds := client.FilterApiIdsByName(apiSummaries, target)
+	if len(apiIds) == 0 && target != "" {
+		log.Printf("API %q does not exist", target)
+		return
+	}
+
 	apiPolicies := client.ExtractApiPolicies(apiIds)
 	allPolicies := client.ExtractOperationPolicies()
 
