@@ -11,7 +11,6 @@ import (
 var BaseURL string
 var Username string
 var Password string
-var EndpointAPI string
 
 func Load() {
 //	Open the .env file
@@ -42,6 +41,5 @@ log.Fatal(err)
 BaseURL = os.Getenv("BASE_URL")
 Username = os.Getenv("USERNAME")
 Password = os.Getenv("PASSWORD")
-EndpointAPI = os.Getenv("API_ENDPOINT")
 
 }

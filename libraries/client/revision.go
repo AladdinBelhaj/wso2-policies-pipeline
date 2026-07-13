@@ -10,12 +10,13 @@ import (
 
 
 const (
-	PathRevision  = "/revisions/"
+	PathRevision = "/revisions/"
+	EndpointAPI = "/apis/" 
 )
 
 // This function verifies if the revisions number has reached 5 or not.
 func ReviewRevisionsNumber(apiId string) (string, bool) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+PathRevision, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+EndpointAPI+apiId+PathRevision, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +38,7 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 
 // This function fetches the ID of each revision.
 func GetRevisionIds(apiId string) ([]string, error) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+vars.EndpointAPI+apiId+PathRevision, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+EndpointAPI+apiId+PathRevision, "-k").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func GetRevisionIds(apiId string) ([]string, error) {
 func UndeployRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+vars.EndpointAPI+apiId+"/undeploy-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+"/undeploy-revision?revisionId="+revisionId,
 		"-H", contentTypeJSON,
 		"-k",
 		"-s", "-w", httpStatusFormat)
@@ -97,7 +98,7 @@ func UndeployRevision(apiId string, revisionId string) error {
 func DeleteRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "DELETE",
-		vars.BaseURL+vars.EndpointAPI+apiId+PathRevision+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+PathRevision+revisionId,
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
@@ -123,7 +124,7 @@ func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+vars.EndpointAPI+apiId+PathRevision,
+		vars.BaseURL+EndpointAPI+apiId+PathRevision,
 		"-H", contentTypeJSON,
 		"-d", string(payload),
 		"-k",
@@ -166,7 +167,7 @@ func DeployRevision(apiId string, revisionId string) error {
 
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+vars.EndpointAPI+apiId+"/deploy-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+"/deploy-revision?revisionId="+revisionId,
 		"-H", contentTypeJSON,
 		"-d", payload,
 		"-k",
@@ -194,7 +195,7 @@ func RestoreRevision(apiId string, revisionId string) error {
 	
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+vars.EndpointAPI+apiId+"/restore-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+"/restore-revision?revisionId="+revisionId,
 		"-H", contentTypeJSON,
 		"-k",
 		"-s", "-w", httpStatusFormat)
