@@ -4,6 +4,7 @@ package client
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strings"
 	"wso2/scripts/vars"
 )
@@ -21,7 +22,13 @@ const (
 // This function creates a new exec.Cmd for a curl command with the provided arguments to interact with WSO2 API Manager.
 func newCurlCmd(args ...string) *exec.Cmd {
 	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)
-	return exec.Command("curl", curlArgs...)
+	
+	curlPath := "/usr/bin/curl"
+	if runtime.GOOS == "windows" {
+		curlPath = `C:\Windows\System32\curl.exe`
+	}
+	
+	return exec.Command(curlPath, curlArgs...)
 }
 
 // This function parses the output of a curl command to extract the HTTP status code and response body.
