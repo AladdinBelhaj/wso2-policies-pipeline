@@ -10,7 +10,8 @@ import (
 
 
 const (
-	EndpointAPI = "/apis/" 
+	PathAPI = "/apis/" 
+	PathOperationPolicies = "/operation-policies"
 )
 
 // This function executes a curl command to fetch the JSON object from the /apis endpoint.
@@ -68,7 +69,7 @@ func ExtractApiIds() []string {
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint.
 func GetApiDetailsJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+EndpointAPI+apiId, "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func ExtractApiPolicies(apiIds []string) []map[string]any {
 
 // This function fetches all common operation policies.
 func getOperationPoliciesJsonObject() []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+"/operation-policies", "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+PathOperationPolicies, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -135,7 +136,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 
 // This function fetches API level policies.
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+EndpointAPI+apiId+"/operation-policies", "-k").Output()
+	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId+PathOperationPolicies, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,7 +159,7 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 func PutApiUpdate(apiId string, payload []byte) error {
 	cmd := newCurlCmd(
 		"-X", "PUT",
-		vars.BaseURL+EndpointAPI+apiId,
+		vars.BaseURL+PathAPI+apiId,
 		"-H", contentTypeJSON,
 		"-d", "@-",
 		"-k",
