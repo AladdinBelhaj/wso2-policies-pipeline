@@ -123,7 +123,17 @@ func resolvePoliciesInFlow(
 		if policyId, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
 
 			currentVersion, _ := pol["policyVersion"].(string)
-			if currentVersion[0:1] < policyVersion[0:1] {
+
+			currentVersionNumber, err1 := versionNumber(currentVersion)
+
+			policyVersionNumber, err2 := versionNumber(policyVersion)
+
+			if err1 != nil || err2 != nil {
+				log.Printf("Invalid version number for policy %s: %s", policyName, currentVersion)
+				continue
+			}
+
+			if currentVersionNumber < policyVersionNumber {
 				log.Printf(
 					"Updating %s policy [%s flow] %s: %s -> %s",
 					level,
@@ -160,7 +170,7 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 			continue
 		}
 
-		num, err := strconv.Atoi(strings.TrimPrefix(version, "v"))
+		num, err := versionNumber(version)
 		if err != nil {
 			continue
 		}
@@ -177,4 +187,8 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 	}
 
 	return latestId, latestVersion, true
+}
+
+func versionNumber(version string) (int, error) {
+	return strconv.Atoi(strings.TrimPrefix(version, "v"))
 }
