@@ -36,6 +36,7 @@ func processSingleApi(apiId string, allPolicies []map[string]interface{}) {
 	}
 
 	if !modified {
+		log.Printf("No changes detected for API %s. Skipping update and deployment.", apiId)
 		return
 	}
 
@@ -101,21 +102,39 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 	}
 
 	changed := false
+
 	for _, polRaw := range flowList {
 		pol, ok := polRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
+
 		policyName, ok := pol["policyName"].(string)
 		if !ok {
 			continue
 		}
+
 		if policyId, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
-			pol["policyId"] = policyId
-			pol["policyVersion"] = policyVersion
-			changed = true
+			currentId, _ := pol["policyId"].(string)
+			currentVersion, _ := pol["policyVersion"].(string)
+
+			if currentVersion != policyVersion {
+				log.Printf(
+					"Updating policy %s: %s/%s -> %s/%s",
+					policyName,
+					currentId,
+					currentVersion,
+					policyId,
+					policyVersion,
+				)
+
+				pol["policyId"] = policyId
+				pol["policyVersion"] = policyVersion
+				changed = true
+			}
 		}
 	}
+
 	return changed
 }
 
