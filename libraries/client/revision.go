@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 	"wso2/scripts/vars"
 )
@@ -66,6 +67,25 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
+// This function runs a curl command for a revision action, checks for a 2xx
+// status, and returns the response body or an error.
+func executeRevisionCurl(cmd *exec.Cmd, actionDesc string) (string, error) {
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s curl error: %v, output: %s", actionDesc, err, output)
+	}
+
+	statusCode, body, err := parseCurlStatus(output, actionDesc)
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(statusCode, "2") {
+		return "", fmt.Errorf("%s failed with HTTP %s: %s", actionDesc, statusCode, body)
+	}
+
+	return body, nil
+}
+
 // This function undeploys a revision before deleting it
 func UndeployRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
@@ -75,17 +95,8 @@ func UndeployRevision(apiId string, revisionId string) error {
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("undeploy revision curl error: %v, output: %s", err, output)
-	}
-
-	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("undeploy revision %s", revisionId))
-	if err != nil {
+	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("undeploy revision %s", revisionId)); err != nil {
 		return err
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		return fmt.Errorf("undeploy revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Printf("Undeployed revision %s successfully\n", revisionId)
@@ -101,17 +112,8 @@ func DeleteRevision(apiId string, revisionId string) error {
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("delete revision curl error: %v, output: %s", err, out)
-	}
-
-	statusCode, body, err := parseCurlStatus(out, fmt.Sprintf("delete revision %s", revisionId))
-	if err != nil {
+	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("delete revision %s", revisionId)); err != nil {
 		return err
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		return fmt.Errorf("delete revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Printf("Deleted revision %s successfully\n", revisionId)
@@ -172,17 +174,8 @@ func DeployRevision(apiId string, revisionId string) error {
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("deploy revision curl error: %v, output: %s", err, output)
-	}
-
-	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("deploy revision %s", revisionId))
-	if err != nil {
+	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("deploy revision %s", revisionId)); err != nil {
 		return err
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		return fmt.Errorf("deploy revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Println("Revision deployed successfully")
@@ -199,17 +192,8 @@ func RestoreRevision(apiId string, revisionId string) error {
 		"-k",
 		"-s", "-w", httpStatusFormat)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("restore revision curl error: %v, output: %s", err, output)
-	}
-
-	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("restore revision %s", revisionId))
-	if err != nil {
+	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("restore revision %s", revisionId)); err != nil {
 		return err
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		return fmt.Errorf("restore revision failed with HTTP %s: %s", statusCode, body)
 	}
 
 	fmt.Println("Revision restored successfully")
