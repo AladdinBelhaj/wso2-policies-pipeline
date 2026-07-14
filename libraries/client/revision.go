@@ -9,12 +9,11 @@ import (
 	"wso2/scripts/vars"
 )
 
-
 const (
-	PathRevision = "/revisions/"
+	PathRevision         = "/revisions/"
 	PathUndeployRevision = "/undeploy-revision?revisionId="
-	PathDeployRevision = "/deploy-revision?revisionId="
-	PathRestoreRevision = "/restore-revision?revisionId="
+	PathDeployRevision   = "/deploy-revision?revisionId="
+	PathRestoreRevision  = "/restore-revision?revisionId="
 )
 
 // This function verifies if the revisions number has reached 5 or not.
@@ -91,12 +90,16 @@ func executeRevisionCurl(cmd *exec.Cmd, actionDesc string) (string, error) {
 
 // This function undeploys a revision before deleting it
 func UndeployRevision(apiId string, revisionId string) error {
+	body := `[{"name":"Default","displayOnDevportal":false}]`
+
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+PathAPI+apiId+PathUndeployRevision+revisionId,
 		"-H", contentTypeJSON,
+		"-d", body,
 		"-k",
-		"-s", "-w", httpStatusFormat)
+		"-s", "-w", httpStatusFormat,
+	)
 
 	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("undeploy revision %s", revisionId)); err != nil {
 		return err
@@ -105,7 +108,6 @@ func UndeployRevision(apiId string, revisionId string) error {
 	fmt.Printf("Undeployed revision %s successfully\n", revisionId)
 	return nil
 }
-
 
 // This function deletes a revision without attempting to undeploy it first
 func DeleteRevision(apiId string, revisionId string) error {
@@ -187,7 +189,7 @@ func DeployRevision(apiId string, revisionId string) error {
 
 // This function restores a previous revision to the API.
 func RestoreRevision(apiId string, revisionId string) error {
-	
+
 	cmd := newCurlCmd(
 		"-X", "POST",
 		vars.BaseURL+PathAPI+apiId+PathRestoreRevision+revisionId,
