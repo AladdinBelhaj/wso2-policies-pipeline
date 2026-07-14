@@ -100,7 +100,7 @@ func RollbackApiRevision(apiId string) error {
 		return fmt.Errorf("\ndelete oldest revision for API %s: %w", apiId, err)
 	}
 
-	if err := DeployRevision(apiId, lastRevisionID); err != nil {
+	if err := DeployRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("deploy new revision for API %s: %w", apiId, err)
 	}
 
