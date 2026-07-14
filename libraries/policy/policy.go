@@ -123,14 +123,7 @@ func resolvePoliciesInFlow(
 		if policyId, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
 
 			currentVersion, _ := pol["policyVersion"].(string)
-			log.Printf(
-				"Checking %s policy [%s flow] current=%s latest=%s",
-				policyName,
-				flow,
-				currentVersion,
-				policyVersion,
-			)
-			if currentVersion != policyVersion {
+			if currentVersion[0:1] < policyVersion[0:1] {
 				log.Printf(
 					"Updating %s policy [%s flow] %s: %s -> %s",
 					level,

@@ -22,12 +22,12 @@ const (
 // This function creates a new exec.Cmd for a curl command with the provided arguments to interact with WSO2 API Manager.
 func newCurlCmd(args ...string) *exec.Cmd {
 	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)
-	
+
 	curlPath := "/usr/bin/curl"
 	if runtime.GOOS == "windows" {
 		curlPath = `C:\Windows\System32\curl.exe`
 	}
-	
+
 	return exec.Command(curlPath, curlArgs...)
 }
 
@@ -44,6 +44,7 @@ func parseCurlStatus(output []byte, action string) (string, string, error) {
 	return statusCode, body, nil
 }
 
+// This function extracts policies from the JSON object and stores them in a map
 func normalizePolicyList(data map[string]any) []map[string]interface{} {
 	list, ok := data["list"].([]interface{})
 	if !ok {

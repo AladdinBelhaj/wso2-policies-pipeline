@@ -52,7 +52,7 @@ func BuildRollbackPreview(apiIDs []string, target string) string {
 	return strings.Join(preview, "\n")
 }
 
-// This function prompts the user for confirmation before proceeding with an action.
+// This function prompts the user for confirmation before proceeding with an action (rollback)
 func ConfirmAction(preview string) bool {
 	fmt.Println(preview)
 	fmt.Print("Proceed? [y/N]: ")
