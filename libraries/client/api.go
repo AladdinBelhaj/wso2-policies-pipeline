@@ -8,10 +8,9 @@ import (
 	"wso2/scripts/vars"
 )
 
-
 const (
-	PathAPI = "/apis/" 
-	PathOperationPolicies = "/operation-policies"
+	PathAPI               = "/apis/"
+	PathOperationPolicies = "/operation-policies?limit=100"
 )
 
 // This function executes a curl command to fetch the JSON object from the /apis endpoint.

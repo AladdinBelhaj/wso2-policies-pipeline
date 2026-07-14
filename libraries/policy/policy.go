@@ -60,7 +60,7 @@ func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string
 
 	modified := false
 	for _, flow := range policyFlows {
-		if resolvePoliciesInFlow(apiPoliciesBlock, flow, policies) {
+		if resolvePoliciesInFlow(apiPoliciesBlock, flow, "API level", policies) {
 			modified = true
 		}
 	}
@@ -84,7 +84,7 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 			continue
 		}
 		for _, flow := range policyFlows {
-			if resolvePoliciesInFlow(opPolicies, flow, policies) {
+			if resolvePoliciesInFlow(opPolicies, flow, "Operation level", policies) {
 				modified = true
 			}
 		}
@@ -92,10 +92,16 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 	return modified
 }
 
-// This function matches each policy in a single flow (request for example) by name
-// against the shared policies list and injects the resolved policyId and policyVersion.
-// Returns true if any policy was updated.
-func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPolicies []map[string]interface{}) bool {
+// This function matches each policy in a single flow (request for example)
+// by name against the shared policies list and injects the resolved policyId
+// and policyVersion.
+// Returns true if any policy version was updated.
+func resolvePoliciesInFlow(
+	opPolicies map[string]interface{},
+	flow string,
+	level string,
+	allPolicies []map[string]interface{},
+) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
 	if !ok {
 		return false
@@ -115,16 +121,22 @@ func resolvePoliciesInFlow(opPolicies map[string]interface{}, flow string, allPo
 		}
 
 		if policyId, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
-			currentId, _ := pol["policyId"].(string)
-			currentVersion, _ := pol["policyVersion"].(string)
 
+			currentVersion, _ := pol["policyVersion"].(string)
+			log.Printf(
+				"Checking %s policy [%s flow] current=%s latest=%s",
+				policyName,
+				flow,
+				currentVersion,
+				policyVersion,
+			)
 			if currentVersion != policyVersion {
 				log.Printf(
-					"Updating policy %s: %s/%s -> %s/%s",
+					"Updating %s policy [%s flow] %s: %s -> %s",
+					level,
+					flow,
 					policyName,
-					currentId,
 					currentVersion,
-					policyId,
 					policyVersion,
 				)
 
