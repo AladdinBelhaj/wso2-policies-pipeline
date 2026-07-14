@@ -12,6 +12,9 @@ import (
 
 const (
 	PathRevision = "/revisions/"
+	PathUndeployRevision = "/undeploy-revision?revisionId="
+	PathDeployRevision = "/deploy-revision?revisionId="
+	PathRestoreRevision = "/restore-revision?revisionId="
 )
 
 // This function verifies if the revisions number has reached 5 or not.
@@ -90,7 +93,7 @@ func executeRevisionCurl(cmd *exec.Cmd, actionDesc string) (string, error) {
 func UndeployRevision(apiId string, revisionId string) error {
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+EndpointAPI+apiId+"/undeploy-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+PathUndeployRevision+revisionId,
 		"-H", contentTypeJSON,
 		"-k",
 		"-s", "-w", httpStatusFormat)
@@ -168,7 +171,7 @@ func DeployRevision(apiId string, revisionId string) error {
 
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+EndpointAPI+apiId+"/deploy-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+PathDeployRevision+revisionId,
 		"-H", contentTypeJSON,
 		"-d", payload,
 		"-k",
@@ -187,7 +190,7 @@ func RestoreRevision(apiId string, revisionId string) error {
 	
 	cmd := newCurlCmd(
 		"-X", "POST",
-		vars.BaseURL+EndpointAPI+apiId+"/restore-revision?revisionId="+revisionId,
+		vars.BaseURL+EndpointAPI+apiId+PathRestoreRevision+revisionId,
 		"-H", contentTypeJSON,
 		"-k",
 		"-s", "-w", httpStatusFormat)
