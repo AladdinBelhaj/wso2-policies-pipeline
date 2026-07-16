@@ -26,6 +26,14 @@ func processSingleApi(apiId string, allPolicies []map[string]interface{}) {
 		log.Fatal(err)
 	}
 
+	apiName, ok := apiDetail["name"].(string)
+	if !ok {
+		log.Println("API name not found")
+		return
+	}
+
+	fmt.Printf("Updating API: %s\n", apiName)
+
 	apiScopedPolicies := append(
 		append([]map[string]interface{}{}, allPolicies...),
 		client.ExtractApiLevelPolicies(apiId)...,
