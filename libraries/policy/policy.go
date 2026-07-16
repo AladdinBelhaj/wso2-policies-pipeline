@@ -281,3 +281,63 @@ func collectPolicyChanges(
 
 	return changes
 }
+
+// ListCurrentPolicies returns human-readable descriptions of all policies
+// currently attached to an API, with their levels, flows, and versions.
+func ListCurrentPolicies(apiId string) []string {
+	var apiDetail map[string]any
+	if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
+		log.Fatal(err)
+	}
+
+	var items []string
+
+	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
+		for _, flow := range policyFlows {
+			items = append(items, listFlowPolicies(apiPoliciesBlock, flow, "API level")...)
+		}
+	}
+
+	if operations, ok := apiDetail["operations"].([]interface{}); ok {
+		for _, opRaw := range operations {
+			op, ok := opRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, flow := range policyFlows {
+				items = append(items, listFlowPolicies(opPolicies, flow, "Operation level")...)
+			}
+		}
+	}
+
+	return items
+}
+
+// listFlowPolicies lists all policies in a single flow with their current versions.
+func listFlowPolicies(opPolicies map[string]interface{}, flow string, level string) []string {
+	flowList, ok := opPolicies[flow].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var items []string
+	for _, polRaw := range flowList {
+		pol, ok := polRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		policyName, _ := pol["policyName"].(string)
+		policyVersion, _ := pol["policyVersion"].(string)
+		if policyName != "" {
+			items = append(items, fmt.Sprintf(
+				"    %s policy [%s flow] %s: %s",
+				level, flow, policyName, policyVersion,
+			))
+		}
+	}
+	return items
+}

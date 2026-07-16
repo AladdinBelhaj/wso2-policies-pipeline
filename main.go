@@ -47,7 +47,31 @@ func executeRollback(target string, dryRun bool) {
 		return
 	}
 
-	preview := client.BuildRollbackPreview(apiIds, target)
+	preview := "Rollback preview:\n"
+	for _, apiId := range apiIds {
+		revisionIDs, err := client.GetRevisionIds(apiId)
+		if err != nil {
+			log.Printf("failed to fetch revisions for API %s: %v", apiId, err)
+			continue
+		}
+		if len(revisionIDs) <= 2 {
+			preview += fmt.Sprintf("  %s: cannot rollback (only %d revision(s))\n", apiId, len(revisionIDs))
+			continue
+		}
+
+		targetRevisionID := revisionIDs[len(revisionIDs)-2]
+		currentPolicies := policy.ListCurrentPolicies(apiId)
+
+		preview += fmt.Sprintf("  %s:\n", apiId)
+		preview += fmt.Sprintf("    Target revision: %s\n", targetRevisionID)
+		if len(currentPolicies) > 0 {
+			preview += "    Current policies that will be reverted:\n"
+			for _, p := range currentPolicies {
+				preview += p + "\n"
+			}
+		}
+	}
+
 	if dryRun || !client.ConfirmAction(preview) {
 		if dryRun {
 			log.Println("dry run: no changes were applied")
@@ -63,6 +87,7 @@ func executeRollback(target string, dryRun bool) {
 		}
 	}
 }
+
 
 func executeUpdatePolicies(target string, dryRun bool) {
 	apiIds := fetchApiIds(target, false)

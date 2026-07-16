@@ -33,24 +33,7 @@ func FilterApiIdsByName(apis []ApiSummary, target string) []string {
 	return matchedIDs
 }
 
-// This function will provide the preview before rolling back
-func BuildRollbackPreview(apiIDs []string, target string) string {
-	targetLabel := "all APIs"
-	if strings.TrimSpace(target) != "" && !strings.EqualFold(target, "all") {
-		targetLabel = fmt.Sprintf("API matching %q", target)
-	}
 
-	preview := []string{
-		fmt.Sprintf("Dry run: %s", targetLabel),
-		fmt.Sprintf("%d API(s) will be processed:", len(apiIDs)),
-	}
-
-	for _, apiID := range apiIDs {
-		preview = append(preview, fmt.Sprintf("- %s", apiID))
-	}
-
-	return strings.Join(preview, "\n")
-}
 
 // This function prompts the user for confirmation before proceeding with an action (rollback)
 func ConfirmAction(preview string) bool {
