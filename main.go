@@ -88,7 +88,6 @@ func executeRollback(target string, dryRun bool) {
 	}
 }
 
-
 func executeUpdatePolicies(target string, dryRun bool) {
 	apiIds := fetchApiIds(target, false)
 	if len(apiIds) == 0 && target != "" {
@@ -116,8 +115,8 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		}
 	}
 
-	apiPolicies := client.ExtractApiPolicies(apiIds)
-	policy.UpdateApiPolicies(apiPolicies, allPolicies)
+	apiDetails := client.ExtractApiPolicies(apiIds)
+	policy.UpdateApiPolicies(apiDetails, allPolicies)
 }
 
 func fetchApiIds(target string, isRollback bool) []string {

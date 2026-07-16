@@ -12,20 +12,14 @@ import (
 
 var policyFlows = []string{"request", "response", "fault"}
 
-// This function fetches each API, resolves policy IDs by name, and PUTs the result back.
-func UpdateApiPolicies(apiPolicies []map[string]any, allPolicies []map[string]interface{}) {
-	for _, apiEntry := range apiPolicies {
-		apiId := apiEntry["apiId"].(string)
-		processSingleApi(apiId, allPolicies)
+// This function iterates over the already-fetched API details, resolves policy IDs by name, and PUTs the result back.
+func UpdateApiPolicies(apiDetails map[string]map[string]any, allPolicies []map[string]interface{}) {
+	for apiId, apiDetail := range apiDetails {
+		processSingleApi(apiId, apiDetail, allPolicies)
 	}
 }
 
-func processSingleApi(apiId string, allPolicies []map[string]interface{}) {
-	var apiDetail map[string]any
-	if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
-		log.Fatal(err)
-	}
-
+func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[string]interface{}) {
 	apiName, ok := apiDetail["name"].(string)
 	if !ok {
 		log.Println("API name not found")

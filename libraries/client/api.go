@@ -75,9 +75,9 @@ func GetApiDetailsJsonObject(apiId string) []byte {
 	return jsonObject
 }
 
-// This function iterates through the list of API IDs and fetches the details for each API, extracting the policies for each operation.
-func ExtractApiPolicies(apiIds []string) []map[string]any {
-	apiPolicies := make([]map[string]any, 0)
+// This function iterates through the list of API IDs and fetches the full details for each API.
+func ExtractApiPolicies(apiIds []string) map[string]map[string]any {
+	apiDetails := make(map[string]map[string]any, len(apiIds))
 
 	for _, apiId := range apiIds {
 		var api map[string]any
@@ -87,29 +87,10 @@ func ExtractApiPolicies(apiIds []string) []map[string]any {
 			log.Fatal(err)
 		}
 
-		operations := make([]map[string]any, 0)
-
-		for _, operation := range api["operations"].([]interface{}) {
-			op := operation.(map[string]interface{})
-
-			operationObject := map[string]any{
-				"target":            op["target"],
-				"verb":              op["verb"],
-				"operationPolicies": op["operationPolicies"],
-			}
-
-			operations = append(operations, operationObject)
-		}
-
-		apiObject := map[string]any{
-			"apiId":      api["id"],
-			"operations": operations,
-		}
-
-		apiPolicies = append(apiPolicies, apiObject)
+		apiDetails[apiId] = api
 	}
 
-	return apiPolicies
+	return apiDetails
 }
 
 // This function fetches all common operation policies.
