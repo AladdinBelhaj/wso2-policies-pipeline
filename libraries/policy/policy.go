@@ -3,6 +3,7 @@ package policy
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -191,4 +192,92 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 
 func versionNumber(version string) (int, error) {
 	return strconv.Atoi(strings.TrimPrefix(version, "v"))
+}
+
+// PreviewApiPolicyUpdates returns human-readable descriptions of the policy
+// changes that would be applied to a single API, without modifying anything.
+func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{}) []string {
+	var apiDetail map[string]any
+	if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
+		log.Fatal(err)
+	}
+
+	apiScopedPolicies := append(
+		append([]map[string]interface{}{}, allPolicies...),
+		client.ExtractApiLevelPolicies(apiId)...,
+	)
+
+	var changes []string
+
+	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
+		for _, flow := range policyFlows {
+			changes = append(changes, collectPolicyChanges(apiPoliciesBlock, flow, "API level", apiScopedPolicies)...)
+		}
+	}
+
+	if operations, ok := apiDetail["operations"].([]interface{}); ok {
+		for _, opRaw := range operations {
+			op, ok := opRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, flow := range policyFlows {
+				changes = append(changes, collectPolicyChanges(opPolicies, flow, "Operation level", apiScopedPolicies)...)
+			}
+		}
+	}
+
+	return changes
+}
+
+// collectPolicyChanges is a read-only variant of resolvePoliciesInFlow.
+// Instead of mutating the policy map, it returns a description for each
+// policy that would be updated.
+func collectPolicyChanges(
+	opPolicies map[string]interface{},
+	flow string,
+	level string,
+	allPolicies []map[string]interface{},
+) []string {
+	flowList, ok := opPolicies[flow].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var changes []string
+
+	for _, polRaw := range flowList {
+		pol, ok := polRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		policyName, ok := pol["policyName"].(string)
+		if !ok {
+			continue
+		}
+
+		if _, policyVersion, found := findNewestPolicyByName(policyName, allPolicies); found {
+			currentVersion, _ := pol["policyVersion"].(string)
+			currentVersionNumber, err1 := versionNumber(currentVersion)
+			policyVersionNumber, err2 := versionNumber(policyVersion)
+
+			if err1 != nil || err2 != nil {
+				continue
+			}
+
+			if currentVersionNumber < policyVersionNumber {
+				changes = append(changes, fmt.Sprintf(
+					"  Updating %s policy [%s flow] %s: %s -> %s",
+					level, flow, policyName, currentVersion, policyVersion,
+				))
+			}
+		}
+	}
+
+	return changes
 }

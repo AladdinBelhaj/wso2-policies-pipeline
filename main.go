@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -69,10 +70,20 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		return
 	}
 
+	allPolicies := client.ExtractOperationPolicies()
+
 	if dryRun {
-		preview := "Dry run: policy updates for the following APIs will be applied:\n"
+		preview := "Dry run: the following policy updates will be applied:\n"
 		for _, apiID := range apiIds {
-			preview += "- " + apiID + "\n"
+			changes := policy.PreviewApiPolicyUpdates(apiID, allPolicies)
+			if len(changes) == 0 {
+				preview += fmt.Sprintf("  %s: no changes\n", apiID)
+			} else {
+				preview += fmt.Sprintf("  %s:\n", apiID)
+				for _, c := range changes {
+					preview += c + "\n"
+				}
+			}
 		}
 		if !client.ConfirmAction(preview) {
 			log.Println("operation cancelled")
@@ -81,19 +92,18 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	}
 
 	apiPolicies := client.ExtractApiPolicies(apiIds)
-	allPolicies := client.ExtractOperationPolicies()
 	policy.UpdateApiPolicies(apiPolicies, allPolicies)
 }
 
 func fetchApiIds(target string, isRollback bool) []string {
 	apiSummaries := client.ExtractApiSummaries()
 	apiIds := client.FilterApiIdsByName(apiSummaries, target)
-	
+
 	if len(apiIds) == 0 {
 		if isRollback || target != "" {
 			log.Printf("API %q does not exist", target)
 		}
 	}
-	
+
 	return apiIds
 }
