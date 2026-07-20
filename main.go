@@ -47,6 +47,40 @@ func executeRollback(target string, dryRun bool) {
 		return
 	}
 
+	productIds := client.FindApiProductIdsUsingApis(apiIds)
+	preview := buildRollbackPreview(apiIds, productIds)
+
+	if dryRun || !client.ConfirmAction(preview) {
+		if dryRun {
+			log.Println("dry run: no changes were applied")
+		} else {
+			log.Println("operation cancelled")
+		}
+		return
+	}
+
+	// Snapshot product state BEFORE the API rollback, since rolling back
+	// a revision of the source API wipes the product's real operation-level
+	// policy attachments as a side effect.
+	var productSnapshots map[string]map[string]any
+	if len(productIds) > 0 {
+		productSnapshots = client.ExtractApiProductPolicies(productIds)
+	}
+
+	for _, apiId := range apiIds {
+		if err := client.RollbackApiRevision(apiId); err != nil {
+			log.Printf("rollback failed for API %s: %v", apiId, err)
+		}
+	}
+
+	// Restore product policies
+	if len(productIds) > 0 {
+		allPolicies := client.ExtractOperationPolicies()
+		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
+	}
+}
+
+func buildRollbackPreview(apiIds []string, productIds []string) string {
 	preview := "Rollback preview:\n"
 	for _, apiId := range apiIds {
 		revisionIDs, err := client.GetRevisionIds(apiId)
@@ -72,20 +106,11 @@ func executeRollback(target string, dryRun bool) {
 		}
 	}
 
-	if dryRun || !client.ConfirmAction(preview) {
-		if dryRun {
-			log.Println("dry run: no changes were applied")
-		} else {
-			log.Println("operation cancelled")
-		}
-		return
+	if len(productIds) > 0 {
+		preview += fmt.Sprintf("  Also affects API Product(s): %s\n", strings.Join(productIds, ", "))
 	}
 
-	for _, apiId := range apiIds {
-		if err := client.RollbackApiRevision(apiId); err != nil {
-			log.Printf("rollback failed for API %s: %v", apiId, err)
-		}
-	}
+	return preview
 }
 
 func executeUpdatePolicies(target string, dryRun bool) {
