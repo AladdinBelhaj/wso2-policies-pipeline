@@ -181,3 +181,46 @@ func getProductApiDetailsJsonObjet(apiProductId string) []byte {
 	}
 	return jsonObject
 }
+
+// This function iterates through the JSON object and fetches the ID and name of each API product.
+func ExtractApiProductSummaries() []ApiProductSummary {
+	jsonObject := getProductApiJsonObject()
+
+	var data map[string]any
+	if err := json.Unmarshal(jsonObject, &data); err != nil {
+		log.Fatal(err)
+	}
+
+	list := data["list"].([]interface{})
+	products := make([]ApiProductSummary, 0, len(list))
+
+	for _, item := range list {
+		product, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		summary := ApiProductSummary{}
+		if id, ok := product["id"].(string); ok {
+			summary.ID = id
+		}
+		if name, ok := product["name"].(string); ok {
+			summary.Name = name
+		}
+		products = append(products, summary)
+	}
+
+	return products
+}
+
+// This function iterates through the JSON object and fetches the ID of each API product.
+func ExtractApiProductIds() []string {
+	summaries := ExtractApiProductSummaries()
+	ids := make([]string, 0, len(summaries))
+	for _, p := range summaries {
+		if p.ID != "" {
+			ids = append(ids, p.ID)
+		}
+	}
+	return ids
+}

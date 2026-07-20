@@ -14,6 +14,11 @@ type ApiSummary struct {
 	Name string
 }
 
+type ApiProductSummary struct {
+	ID   string
+	Name string
+}
+
 const (
 	contentTypeJSON  = "Content-Type: application/json"
 	httpStatusFormat = "\nHTTP_STATUS:%{http_code}"
