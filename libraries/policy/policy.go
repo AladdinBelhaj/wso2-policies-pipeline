@@ -312,21 +312,27 @@ func ListCurrentPolicies(apiId string) []string {
 	}
 
 	if operations, ok := apiDetail["operations"].([]interface{}); ok {
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			for _, flow := range policyFlows {
-				items = append(items, listFlowPolicies(opPolicies, flow, LevelOperation)...)
-			}
-		}
+		items = append(items, listOperationsPolicies(operations)...)
 	}
 
+	return items
+}
+
+func listOperationsPolicies(operations []interface{}) []string {
+	var items []string
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, flow := range policyFlows {
+			items = append(items, listFlowPolicies(opPolicies, flow, LevelOperation)...)
+		}
+	}
 	return items
 }
 
