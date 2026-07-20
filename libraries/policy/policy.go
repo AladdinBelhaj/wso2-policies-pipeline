@@ -201,6 +201,24 @@ func versionNumber(version string) (int, error) {
 	return strconv.Atoi(strings.TrimPrefix(version, "v"))
 }
 
+func collectOperationsPolicyChanges(operations []interface{}, apiScopedPolicies []map[string]interface{}) []string {
+	var changes []string
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, flow := range policyFlows {
+			changes = append(changes, collectPolicyChanges(opPolicies, flow, LevelOperation, apiScopedPolicies)...)
+		}
+	}
+	return changes
+}
+
 // PreviewApiPolicyUpdates returns human-readable descriptions of the policy
 // changes that would be applied to a single API, without modifying anything.
 func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{}) []string {
@@ -223,19 +241,7 @@ func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{})
 	}
 
 	if operations, ok := apiDetail["operations"].([]interface{}); ok {
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			for _, flow := range policyFlows {
-				changes = append(changes, collectPolicyChanges(opPolicies, flow, LevelOperation, apiScopedPolicies)...)
-			}
-		}
+		changes = append(changes, collectOperationsPolicyChanges(operations, apiScopedPolicies)...)
 	}
 
 	return changes
