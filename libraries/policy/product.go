@@ -42,17 +42,6 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 		return
 	}
 
-	// Step 1: PUT with operations stripped from each `apis[i]` entry.
-	strippedJson, err := json.Marshal(stripApiProductOperations(productDetail))
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := client.PutApiProductUpdate(productId, strippedJson); err != nil {
-		log.Printf("failed to strip operations for API Product %s: %v", productId, err)
-		return
-	}
-
-	// Step 2: PUT again with operations (and updated policy IDs/versions) restored.
 	updatedJson, err := json.Marshal(productDetail)
 	if err != nil {
 		log.Fatal(err)
