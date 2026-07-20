@@ -265,3 +265,46 @@ func PutApiProductUpdate(apiProductId string, payload []byte) error {
 	fmt.Printf("PUT /api-products/%s: FAILED (HTTP %s) - %s\n", apiProductId, statusCode, body)
 	return fmt.Errorf("HTTP %s", statusCode)
 }
+
+// This function returns the IDs of API products that reference any of the given API IDs
+// in their apis[].apiId list.
+func FindApiProductIdsUsingApis(apiIds []string) []string {
+	if len(apiIds) == 0 {
+		return nil
+	}
+
+	idSet := make(map[string]bool, len(apiIds))
+	for _, id := range apiIds {
+		idSet[id] = true
+	}
+
+	productSummaries := ExtractApiProductSummaries()
+	var matched []string
+
+	for _, summary := range productSummaries {
+		var product map[string]any
+		data := getApiProductDetailsJsonObject(summary.ID)
+		if err := json.Unmarshal(data, &product); err != nil {
+			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
+			continue
+		}
+
+		apis, ok := product["apis"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, apiRaw := range apis {
+			api, ok := apiRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if apiId, ok := api["apiId"].(string); ok && idSet[apiId] {
+				matched = append(matched, summary.ID)
+				break
+			}
+		}
+	}
+
+	return matched
+}
