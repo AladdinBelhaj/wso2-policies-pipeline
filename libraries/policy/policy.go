@@ -10,6 +10,11 @@ import (
 	"wso2/scripts/libraries/client"
 )
 
+const (
+	LevelAPI       = "API level"
+	LevelOperation = "Operation level"
+)
+
 var policyFlows = []string{"request", "response", "fault"}
 
 // This function iterates over the already-fetched API details, resolves policy IDs by name, and PUTs the result back.
@@ -63,7 +68,7 @@ func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string
 
 	modified := false
 	for _, flow := range policyFlows {
-		if resolvePoliciesInFlow(apiPoliciesBlock, flow, "API level", policies) {
+		if resolvePoliciesInFlow(apiPoliciesBlock, flow, LevelAPI, policies) {
 			modified = true
 		}
 	}
@@ -87,7 +92,7 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 			continue
 		}
 		for _, flow := range policyFlows {
-			if resolvePoliciesInFlow(opPolicies, flow, "Operation level", policies) {
+			if resolvePoliciesInFlow(opPolicies, flow, LevelOperation, policies) {
 				modified = true
 			}
 		}
@@ -213,7 +218,7 @@ func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{})
 
 	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
 		for _, flow := range policyFlows {
-			changes = append(changes, collectPolicyChanges(apiPoliciesBlock, flow, "API level", apiScopedPolicies)...)
+			changes = append(changes, collectPolicyChanges(apiPoliciesBlock, flow, LevelAPI, apiScopedPolicies)...)
 		}
 	}
 
@@ -228,7 +233,7 @@ func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{})
 				continue
 			}
 			for _, flow := range policyFlows {
-				changes = append(changes, collectPolicyChanges(opPolicies, flow, "Operation level", apiScopedPolicies)...)
+				changes = append(changes, collectPolicyChanges(opPolicies, flow, LevelOperation, apiScopedPolicies)...)
 			}
 		}
 	}
@@ -296,7 +301,7 @@ func ListCurrentPolicies(apiId string) []string {
 
 	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
 		for _, flow := range policyFlows {
-			items = append(items, listFlowPolicies(apiPoliciesBlock, flow, "API level")...)
+			items = append(items, listFlowPolicies(apiPoliciesBlock, flow, LevelAPI)...)
 		}
 	}
 
@@ -311,7 +316,7 @@ func ListCurrentPolicies(apiId string) []string {
 				continue
 			}
 			for _, flow := range policyFlows {
-				items = append(items, listFlowPolicies(opPolicies, flow, "Operation level")...)
+				items = append(items, listFlowPolicies(opPolicies, flow, LevelOperation)...)
 			}
 		}
 	}
