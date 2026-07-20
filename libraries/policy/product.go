@@ -56,7 +56,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 	}
 }
 
-// updateApiProductOperations walks apis[].operations[].operationPolicies and
+// // updateApiProductOperations walks apis[].operations[].operationPolicies and
 // resolves real (non-reflected) operation-level policy versions in place.
 func updateApiProductOperations(productDetail map[string]any, policies []map[string]interface{}) bool {
 	apis, ok := productDetail["apis"].([]interface{})
@@ -70,30 +70,44 @@ func updateApiProductOperations(productDetail map[string]any, policies []map[str
 		if !ok {
 			continue
 		}
-		operations, ok := api["operations"].([]interface{})
+		if updateSingleApiOperations(api, policies) {
+			modified = true
+		}
+	}
+	return modified
+}
+
+func updateSingleApiOperations(api map[string]interface{}, policies []map[string]interface{}) bool {
+	operations, ok := api["operations"].([]interface{})
+	if !ok {
+		return false
+	}
+	modified := false
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			for _, flow := range productPolicyFlows {
-				if resolveProductPoliciesInFlow(opPolicies, flow, policies) {
-					modified = true
-				}
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, flow := range productPolicyFlows {
+			if resolveProductPoliciesInFlow(opPolicies, flow, policies) {
+				modified = true
 			}
 		}
 	}
 	return modified
 }
 
-// resolveProductPoliciesInFlow matches each operation-level policy against shared list
+// resolveProductPoliciesInFlow matches each REAL operation-level policy
+// (policyType != "api") in a single flow against the shared policies list
+// and injects the resolved policyId/policyVersion. Entries with
+// policyType:"api" are read-only reflections of the source API's API-level
+// policies embedded by WSO2 for display only, and are skipped entirely -
+// they are never real attachments on the product and must never be treated
+// as updatable.
 func resolveProductPoliciesInFlow(
 	opPolicies map[string]interface{},
 	flow string,
@@ -111,39 +125,49 @@ func resolveProductPoliciesInFlow(
 		if !ok {
 			continue
 		}
-
-		if policyType, _ := pol["policyType"].(string); policyType == "api" {
-			continue
-		}
-
-		policyName, ok := pol["policyName"].(string)
-		if !ok {
-			continue
-		}
-
-		if policyId, policyVersion, found := findNewestProductPolicyByName(policyName, allPolicies); found {
-			currentVersion, _ := pol["policyVersion"].(string)
-			currentVersionNumber, err1 := productVersionNumber(currentVersion)
-			policyVersionNumber, err2 := productVersionNumber(policyVersion)
-
-			if err1 != nil || err2 != nil {
-				log.Printf("Invalid version number for product policy %s: %s", policyName, currentVersion)
-				continue
-			}
-
-			if currentVersionNumber < policyVersionNumber {
-				log.Printf(
-					"Updating API Product operation policy [%s flow] %s: %s -> %s",
-					flow, policyName, currentVersion, policyVersion,
-				)
-				pol["policyId"] = policyId
-				pol["policyVersion"] = policyVersion
-				changed = true
-			}
+		if resolveSingleProductPolicy(pol, flow, allPolicies) {
+			changed = true
 		}
 	}
 
 	return changed
+}
+
+func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPolicies []map[string]interface{}) bool {
+	if policyType, _ := pol["policyType"].(string); policyType == "api" {
+		return false
+	}
+
+	policyName, ok := pol["policyName"].(string)
+	if !ok {
+		return false
+	}
+
+	policyId, policyVersion, found := findNewestProductPolicyByName(policyName, allPolicies)
+	if !found {
+		return false
+	}
+
+	currentVersion, _ := pol["policyVersion"].(string)
+	currentVersionNumber, err1 := productVersionNumber(currentVersion)
+	policyVersionNumber, err2 := productVersionNumber(policyVersion)
+
+	if err1 != nil || err2 != nil {
+		log.Printf("Invalid version number for product policy %s: %s", policyName, currentVersion)
+		return false
+	}
+
+	if currentVersionNumber < policyVersionNumber {
+		log.Printf(
+			"Updating API Product operation policy [%s flow] %s: %s -> %s",
+			flow, policyName, currentVersion, policyVersion,
+		)
+		pol["policyId"] = policyId
+		pol["policyVersion"] = policyVersion
+		return true
+	}
+
+	return false
 }
 
 // findNewestProductPolicyByName looks up a policy by name in the shared
@@ -206,39 +230,47 @@ func sanitizeApiProductOperations(productDetail map[string]any) {
 		if !ok {
 			continue
 		}
-		operations, ok := api["operations"].([]interface{})
+		sanitizeSingleApiOperations(api)
+	}
+}
+
+func sanitizeSingleApiOperations(api map[string]interface{}) {
+	operations, ok := api["operations"].([]interface{})
+	if !ok {
+		return
+	}
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			for _, flow := range productPolicyFlows {
-				flowList, ok := opPolicies[flow].([]interface{})
-				if !ok {
-					continue
-				}
-				filtered := make([]interface{}, 0, len(flowList))
-				for _, polRaw := range flowList {
-					pol, ok := polRaw.(map[string]interface{})
-					if !ok {
-						filtered = append(filtered, polRaw)
-						continue
-					}
-					if policyType, _ := pol["policyType"].(string); policyType == "api" {
-						continue
-					}
-					filtered = append(filtered, polRaw)
-				}
-				opPolicies[flow] = filtered
-			}
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
+			continue
 		}
+		sanitizeSingleOperationFlows(opPolicies)
+	}
+}
+
+func sanitizeSingleOperationFlows(opPolicies map[string]interface{}) {
+	for _, flow := range productPolicyFlows {
+		flowList, ok := opPolicies[flow].([]interface{})
+		if !ok {
+			continue
+		}
+		filtered := make([]interface{}, 0, len(flowList))
+		for _, polRaw := range flowList {
+			pol, ok := polRaw.(map[string]interface{})
+			if !ok {
+				filtered = append(filtered, polRaw)
+				continue
+			}
+			if policyType, _ := pol["policyType"].(string); policyType == "api" {
+				continue
+			}
+			filtered = append(filtered, polRaw)
+		}
+		opPolicies[flow] = filtered
 	}
 }
 
@@ -270,56 +302,66 @@ func SnapshotApiProductRealPolicies(productDetail map[string]any) map[string][]O
 			continue
 		}
 		apiId, _ := api["apiId"].(string)
-
-		operations, ok := api["operations"].([]interface{})
-		if !ok {
-			continue
+		if snaps := snapshotSingleApiOperations(api); snaps != nil {
+			result[apiId] = snaps
 		}
-
-		var snaps []OperationPolicySnapshot
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			target, _ := op["target"].(string)
-			verb, _ := op["verb"].(string)
-
-			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			snap := OperationPolicySnapshot{Verb: verb, Target: target, Flows: map[string][]map[string]interface{}{}}
-
-			for _, flow := range productPolicyFlows {
-				flowList, ok := opPolicies[flow].([]interface{})
-				if !ok {
-					continue
-				}
-				var real []map[string]interface{}
-				for _, polRaw := range flowList {
-					pol, ok := polRaw.(map[string]interface{})
-					if !ok {
-						continue
-					}
-					if policyType, _ := pol["policyType"].(string); policyType == "api" {
-						continue
-					}
-					real = append(real, pol)
-				}
-				if len(real) > 0 {
-					snap.Flows[flow] = real
-				}
-			}
-
-			snaps = append(snaps, snap)
-		}
-
-		result[apiId] = snaps
 	}
 
 	return result
+}
+
+func snapshotSingleApiOperations(api map[string]interface{}) []OperationPolicySnapshot {
+	operations, ok := api["operations"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var snaps []OperationPolicySnapshot
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if snap, ok := snapshotSingleOperation(op); ok {
+			snaps = append(snaps, snap)
+		}
+	}
+	return snaps
+}
+
+func snapshotSingleOperation(op map[string]interface{}) (OperationPolicySnapshot, bool) {
+	target, _ := op["target"].(string)
+	verb, _ := op["verb"].(string)
+
+	opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+	if !ok {
+		return OperationPolicySnapshot{}, false
+	}
+
+	snap := OperationPolicySnapshot{Verb: verb, Target: target, Flows: map[string][]map[string]interface{}{}}
+
+	for _, flow := range productPolicyFlows {
+		flowList, ok := opPolicies[flow].([]interface{})
+		if !ok {
+			continue
+		}
+		var real []map[string]interface{}
+		for _, polRaw := range flowList {
+			pol, ok := polRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if policyType, _ := pol["policyType"].(string); policyType == "api" {
+				continue
+			}
+			real = append(real, pol)
+		}
+		if len(real) > 0 {
+			snap.Flows[flow] = real
+		}
+	}
+
+	return snap, true
 }
 
 // RestoreApiProductPolicies resolves each pre-update snapshot's policies to
@@ -340,29 +382,12 @@ func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[strin
 func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}) {
 	realByApi := SnapshotApiProductRealPolicies(snapshotDetail)
 
-	hasAny := false
-	for _, snaps := range realByApi {
-		for _, s := range snaps {
-			if len(s.Flows) > 0 {
-				hasAny = true
-			}
-		}
-	}
-	if !hasAny {
+	if !hasAnyPolicies(realByApi) {
 		log.Printf("No real operation-level policies to restore for API Product %s", productId)
 		return
 	}
 
-	// Resolve each snapshotted policy to its newest version before writing it back.
-	for _, snaps := range realByApi {
-		for i := range snaps {
-			for flow, policies := range snaps[i].Flows {
-				wrapped := map[string]interface{}{flow: toPolicyInterfaceSlice(policies)}
-				resolveProductPoliciesInFlow(wrapped, flow, allPolicies)
-				snaps[i].Flows[flow] = fromPolicyInterfaceSlice(wrapped[flow].([]interface{}))
-			}
-		}
-	}
+	resolveSnapshots(realByApi, allPolicies)
 
 	fresh := client.GetApiProductDetailsJsonObject(productId)
 	var freshDetail map[string]any
@@ -397,6 +422,29 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 	fmt.Printf("Restored real operation policies for API Product %s\n", productId)
 }
 
+func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
+	for _, snaps := range realByApi {
+		for _, s := range snaps {
+			if len(s.Flows) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func resolveSnapshots(realByApi map[string][]OperationPolicySnapshot, allPolicies []map[string]interface{}) {
+	for _, snaps := range realByApi {
+		for i := range snaps {
+			for flow, policies := range snaps[i].Flows {
+				wrapped := map[string]interface{}{flow: toPolicyInterfaceSlice(policies)}
+				resolveProductPoliciesInFlow(wrapped, flow, allPolicies)
+				snaps[i].Flows[flow] = fromPolicyInterfaceSlice(wrapped[flow].([]interface{}))
+			}
+		}
+	}
+}
+
 // mergeRealOperationPolicies writes the resolved real policies back into the
 // matching operation (matched by apiId + target + verb) of a freshly
 // fetched product detail.
@@ -416,33 +464,40 @@ func mergeRealOperationPolicies(productDetail map[string]any, realByApi map[stri
 		if !ok {
 			continue
 		}
+		mergeSnapsIntoApiOperations(api, snaps)
+	}
+}
 
-		operations, ok := api["operations"].([]interface{})
+func mergeSnapsIntoApiOperations(api map[string]interface{}, snaps []OperationPolicySnapshot) {
+	operations, ok := api["operations"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, opRaw := range operations {
+		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
+		mergeSnapsIntoOperation(op, snaps)
+	}
+}
 
-		for _, opRaw := range operations {
-			op, ok := opRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			target, _ := op["target"].(string)
-			verb, _ := op["verb"].(string)
+func mergeSnapsIntoOperation(op map[string]interface{}, snaps []OperationPolicySnapshot) {
+	target, _ := op["target"].(string)
+	verb, _ := op["verb"].(string)
 
-			for _, snap := range snaps {
-				if snap.Target != target || snap.Verb != verb {
-					continue
-				}
-				opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-				if !ok {
-					continue
-				}
-				for flow, real := range snap.Flows {
-					existing, _ := opPolicies[flow].([]interface{})
-					opPolicies[flow] = append(existing, toPolicyInterfaceSlice(real)...)
-				}
-			}
+	for _, snap := range snaps {
+		if snap.Target != target || snap.Verb != verb {
+			continue
+		}
+		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for flow, real := range snap.Flows {
+			existing, _ := opPolicies[flow].([]interface{})
+			opPolicies[flow] = append(existing, toPolicyInterfaceSlice(real)...)
 		}
 	}
 }
