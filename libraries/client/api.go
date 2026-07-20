@@ -165,7 +165,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	return fmt.Errorf("HTTP %s", statusCode)
 }
 
-func getProductApiJsonObject() []byte {
+func getApiProductJsonObject() []byte {
 	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products", "-k").Output()
 	if err != nil {
 		log.Fatal(err)
@@ -174,7 +174,7 @@ func getProductApiJsonObject() []byte {
 	return jsonObject
 }
 
-func getProductApiDetailsJsonObjet(apiProductId string) []byte {
+func getApiProductDetailsJsonObject(apiProductId string) []byte {
 	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products/"+apiProductId, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
@@ -184,7 +184,7 @@ func getProductApiDetailsJsonObjet(apiProductId string) []byte {
 
 // This function iterates through the JSON object and fetches the ID and name of each API product.
 func ExtractApiProductSummaries() []ApiProductSummary {
-	jsonObject := getProductApiJsonObject()
+	jsonObject := getApiProductJsonObject()
 
 	var data map[string]any
 	if err := json.Unmarshal(jsonObject, &data); err != nil {
@@ -223,4 +223,45 @@ func ExtractApiProductIds() []string {
 		}
 	}
 	return ids
+}
+
+func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
+	details := make(map[string]map[string]any, len(productIds))
+	for _, id := range productIds {
+		var product map[string]any
+		if err := json.Unmarshal(getApiProductDetailsJsonObject(id), &product); err != nil {
+			log.Fatal(err)
+		}
+		details[id] = product
+	}
+	return details
+}
+
+func PutApiProductUpdate(apiProductId string, payload []byte) error {
+	cmd := newCurlCmd(
+		"-X", "PUT",
+		vars.BaseURL+"/api-products/"+apiProductId,
+		"-H", contentTypeJSON,
+		"-d", "@-",
+		"-k",
+		"-s", "-w", httpStatusFormat)
+
+	cmd.Stdin = strings.NewReader(string(payload))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("PUT /api-products/%s curl error: %v, output: %s", apiProductId, err, output)
+	}
+
+	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("PUT /api-products/%s", apiProductId))
+	if err != nil {
+		return err
+	}
+	if strings.HasPrefix(statusCode, "2") {
+		fmt.Printf("PUT /api-products/%s: OK (HTTP %s)\n", apiProductId, statusCode)
+		return nil
+	}
+
+	fmt.Printf("PUT /api-products/%s: FAILED (HTTP %s) - %s\n", apiProductId, statusCode, body)
+	return fmt.Errorf("HTTP %s", statusCode)
 }

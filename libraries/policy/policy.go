@@ -343,3 +343,119 @@ func listFlowPolicies(opPolicies map[string]interface{}, flow string, level stri
 	}
 	return items
 }
+
+// This function iterates over the already-fetched API product details, resolves
+// operation policy IDs by name, and PUTs the result back with the two-step
+// strip/restore dance WSO2 needs to actually pick up the policy change.
+func UpdateApiProductPolicies(productDetails map[string]map[string]any, allPolicies []map[string]interface{}) {
+	for productId, productDetail := range productDetails {
+		processSingleApiProduct(productId, productDetail, allPolicies)
+	}
+}
+
+func processSingleApiProduct(productId string, productDetail map[string]any, allPolicies []map[string]interface{}) {
+	productName, ok := productDetail["name"].(string)
+	if !ok {
+		log.Println("API product name not found")
+		return
+	}
+
+	fmt.Printf("Updating API Product: %s\n", productName)
+
+	if !updateApiProductOperationsPoliciesBlock(productDetail, allPolicies) {
+		log.Printf("No changes detected for API Product %s. Skipping update.", productId)
+		return
+	}
+
+	// Step 1: PUT with operations stripped from each `apis[i]` entry.
+	strippedJson, err := json.Marshal(stripApiProductOperations(productDetail))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.PutApiProductUpdate(productId, strippedJson); err != nil {
+		log.Printf("failed to strip operations for API Product %s: %v", productId, err)
+		return
+	}
+
+	// Step 2: PUT again with operations (and updated policy IDs/versions) restored.
+	updatedJson, err := json.Marshal(productDetail)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
+		log.Printf("failed to update API Product %s: %v", productId, err)
+		return
+	}
+}
+
+// updateApiProductOperationsPoliciesBlock walks apis[].operations[].operationPolicies
+// and resolves policy versions in place, reusing the same resolvePoliciesInFlow logic
+// used for regular APIs.
+func updateApiProductOperationsPoliciesBlock(productDetail map[string]any, policies []map[string]interface{}) bool {
+	apis, ok := productDetail["apis"].([]interface{})
+	if !ok {
+		return false
+	}
+
+	modified := false
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		operations, ok := api["operations"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, opRaw := range operations {
+			op, ok := opRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, flow := range policyFlows {
+				if resolvePoliciesInFlow(opPolicies, flow, "Operation level", policies) {
+					modified = true
+				}
+			}
+		}
+	}
+	return modified
+}
+
+// stripApiProductOperations returns a copy of productDetail with "operations"
+// removed from every entry in "apis", so the first PUT registers as a real change.
+func stripApiProductOperations(productDetail map[string]any) map[string]any {
+	stripped := make(map[string]any, len(productDetail))
+	for k, v := range productDetail {
+		stripped[k] = v
+	}
+
+	apis, ok := stripped["apis"].([]interface{})
+	if !ok {
+		return stripped
+	}
+
+	strippedApis := make([]interface{}, 0, len(apis))
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			strippedApis = append(strippedApis, apiRaw)
+			continue
+		}
+		strippedApi := make(map[string]interface{}, len(api))
+		for k, v := range api {
+			if k == "operations" {
+				continue
+			}
+			strippedApi[k] = v
+		}
+		strippedApis = append(strippedApis, strippedApi)
+	}
+	stripped["apis"] = strippedApis
+
+	return stripped
+}
