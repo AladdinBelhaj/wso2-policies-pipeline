@@ -42,6 +42,17 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 		return
 	}
 
+	// Step 1: PUT with operations stripped from each `apis[i]` entry.
+	strippedJson, err := json.Marshal(stripApiProductOperations(productDetail))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.PutApiProductUpdate(productId, strippedJson); err != nil {
+		log.Printf("failed to strip operations for API Product %s: %v", productId, err)
+		return
+	}
+
+	// Step 2: PUT again with operations (and updated policy IDs/versions) restored.
 	updatedJson, err := json.Marshal(productDetail)
 	if err != nil {
 		log.Fatal(err)
@@ -242,6 +253,216 @@ func sanitizeApiProductOperations(productDetail map[string]any) {
 			}
 		}
 	}
+}
+
+// OperationPolicySnapshot captures the real (non-reflection) operation-level
+// policies attached to one operation at a point in time, so they can be
+// restored later after something (e.g. a source API revision redeploy)
+// wipes the product's operation policy state.
+type OperationPolicySnapshot struct {
+	Verb   string
+	Target string
+	Flows  map[string][]map[string]interface{} // flow -> real (non "api" type) policy entries
+}
+
+// SnapshotApiProductRealPolicies must be called BEFORE the source API is
+// updated/redeployed. It captures only genuine attachments (policyType !=
+// "api") per operation, keyed by the owning apiId, so they can be resolved
+// to newer versions and written back after the redeploy wipes them.
+func SnapshotApiProductRealPolicies(productDetail map[string]any) map[string][]OperationPolicySnapshot {
+	result := make(map[string][]OperationPolicySnapshot)
+
+	apis, ok := productDetail["apis"].([]interface{})
+	if !ok {
+		return result
+	}
+
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		apiId, _ := api["apiId"].(string)
+
+		operations, ok := api["operations"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		var snaps []OperationPolicySnapshot
+		for _, opRaw := range operations {
+			op, ok := opRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			target, _ := op["target"].(string)
+			verb, _ := op["verb"].(string)
+
+			opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			snap := OperationPolicySnapshot{Verb: verb, Target: target, Flows: map[string][]map[string]interface{}{}}
+
+			for _, flow := range productPolicyFlows {
+				flowList, ok := opPolicies[flow].([]interface{})
+				if !ok {
+					continue
+				}
+				var real []map[string]interface{}
+				for _, polRaw := range flowList {
+					pol, ok := polRaw.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if policyType, _ := pol["policyType"].(string); policyType == "api" {
+						continue
+					}
+					real = append(real, pol)
+				}
+				if len(real) > 0 {
+					snap.Flows[flow] = real
+				}
+			}
+
+			snaps = append(snaps, snap)
+		}
+
+		result[apiId] = snaps
+	}
+
+	return result
+}
+
+// RestoreApiProductPolicies resolves each pre-update snapshot's policies to
+// their newest versions, re-fetches the CURRENT (post-redeploy) product
+// state, merges the resolved real policies back into the matching
+// operations, and PUTs the result back so real attachments survive the
+// source API's redeploy instead of being silently dropped.
+func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}) {
+	for _, productId := range productIds {
+		snapshotDetail, ok := preUpdateSnapshots[productId]
+		if !ok {
+			continue
+		}
+		restoreSingleApiProduct(productId, snapshotDetail, allPolicies)
+	}
+}
+
+func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}) {
+	realByApi := SnapshotApiProductRealPolicies(snapshotDetail)
+
+	hasAny := false
+	for _, snaps := range realByApi {
+		for _, s := range snaps {
+			if len(s.Flows) > 0 {
+				hasAny = true
+			}
+		}
+	}
+	if !hasAny {
+		log.Printf("No real operation-level policies to restore for API Product %s", productId)
+		return
+	}
+
+	// Resolve each snapshotted policy to its newest version before writing it back.
+	for _, snaps := range realByApi {
+		for i := range snaps {
+			for flow, policies := range snaps[i].Flows {
+				wrapped := map[string]interface{}{flow: toPolicyInterfaceSlice(policies)}
+				resolveProductPoliciesInFlow(wrapped, flow, allPolicies)
+				snaps[i].Flows[flow] = fromPolicyInterfaceSlice(wrapped[flow].([]interface{}))
+			}
+		}
+	}
+
+	fresh := client.GetApiProductDetailsJsonObject(productId)
+	var freshDetail map[string]any
+	if err := json.Unmarshal(fresh, &freshDetail); err != nil {
+		log.Printf("failed to fetch current API Product %s: %v", productId, err)
+		return
+	}
+
+	mergeRealOperationPolicies(freshDetail, realByApi)
+
+	updatedJson, err := json.Marshal(freshDetail)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
+		log.Printf("failed to restore policies for API Product %s: %v", productId, err)
+		return
+	}
+	fmt.Printf("Restored real operation policies for API Product %s\n", productId)
+}
+
+// mergeRealOperationPolicies writes the resolved real policies back into the
+// matching operation (matched by apiId + target + verb) of a freshly
+// fetched product detail.
+func mergeRealOperationPolicies(productDetail map[string]any, realByApi map[string][]OperationPolicySnapshot) {
+	apis, ok := productDetail["apis"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		apiId, _ := api["apiId"].(string)
+		snaps, ok := realByApi[apiId]
+		if !ok {
+			continue
+		}
+
+		operations, ok := api["operations"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, opRaw := range operations {
+			op, ok := opRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			target, _ := op["target"].(string)
+			verb, _ := op["verb"].(string)
+
+			for _, snap := range snaps {
+				if snap.Target != target || snap.Verb != verb {
+					continue
+				}
+				opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				for flow, real := range snap.Flows {
+					existing, _ := opPolicies[flow].([]interface{})
+					opPolicies[flow] = append(existing, toPolicyInterfaceSlice(real)...)
+				}
+			}
+		}
+	}
+}
+
+func toPolicyInterfaceSlice(policies []map[string]interface{}) []interface{} {
+	out := make([]interface{}, len(policies))
+	for i, p := range policies {
+		out[i] = p
+	}
+	return out
+}
+
+func fromPolicyInterfaceSlice(items []interface{}) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]interface{}); ok {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // stripApiProductOperations returns a copy of productDetail with "operations"

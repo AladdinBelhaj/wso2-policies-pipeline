@@ -174,7 +174,7 @@ func getApiProductJsonObject() []byte {
 	return jsonObject
 }
 
-func getApiProductDetailsJsonObject(apiProductId string) []byte {
+func GetApiProductDetailsJsonObject(apiProductId string) []byte {
 	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products/"+apiProductId, "-k").Output()
 	if err != nil {
 		log.Fatal(err)
@@ -229,7 +229,7 @@ func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
 	details := make(map[string]map[string]any, len(productIds))
 	for _, id := range productIds {
 		var product map[string]any
-		if err := json.Unmarshal(getApiProductDetailsJsonObject(id), &product); err != nil {
+		if err := json.Unmarshal(GetApiProductDetailsJsonObject(id), &product); err != nil {
 			log.Fatal(err)
 		}
 		details[id] = product
@@ -283,7 +283,7 @@ func FindApiProductIdsUsingApis(apiIds []string) []string {
 
 	for _, summary := range productSummaries {
 		var product map[string]any
-		data := getApiProductDetailsJsonObject(summary.ID)
+		data := GetApiProductDetailsJsonObject(summary.ID)
 		if err := json.Unmarshal(data, &product); err != nil {
 			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
 			continue

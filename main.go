@@ -253,12 +253,19 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		}
 	}
 
+	// Snapshot product state BEFORE the API update/redeploy, since deploying
+	// a new revision of the source API wipes the product's real operation-level
+	// policy attachments as a side effect.
+	var productSnapshots map[string]map[string]any
+	if len(productIds) > 0 {
+		productSnapshots = client.ExtractApiProductPolicies(productIds)
+	}
+
 	apiDetails := client.ExtractApiPolicies(apiIds)
 	policy.UpdateApiPolicies(apiDetails, allPolicies)
 
 	if len(productIds) > 0 {
-		productDetails := client.ExtractApiProductPolicies(productIds)
-		policy.UpdateApiProductPolicies(productDetails, allPolicies)
+		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
 	}
 }
 
