@@ -164,3 +164,20 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	fmt.Printf("PUT /apis/%s: FAILED (HTTP %s) - %s\n", apiId, statusCode, body)
 	return fmt.Errorf("HTTP %s", statusCode)
 }
+
+func getProductApiJsonObject() []byte {
+	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products", "-k").Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return jsonObject
+}
+
+func getProductApiDetailsJsonObjet(apiProductId string) []byte {
+	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products/"+apiProductId, "-k").Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return jsonObject
+}
