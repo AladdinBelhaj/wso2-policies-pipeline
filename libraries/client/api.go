@@ -266,6 +266,24 @@ func PutApiProductUpdate(apiProductId string, payload []byte) error {
 	return fmt.Errorf("HTTP %s", statusCode)
 }
 
+func productReferencesApis(product map[string]any, idSet map[string]bool) bool {
+	apis, ok := product["apis"].([]interface{})
+	if !ok {
+		return false
+	}
+
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if apiId, ok := api["apiId"].(string); ok && idSet[apiId] {
+			return true
+		}
+	}
+	return false
+}
+
 // This function returns the IDs of API products that reference any of the given API IDs
 // in their apis[].apiId list.
 func FindApiProductIdsUsingApis(apiIds []string) []string {
@@ -289,20 +307,8 @@ func FindApiProductIdsUsingApis(apiIds []string) []string {
 			continue
 		}
 
-		apis, ok := product["apis"].([]interface{})
-		if !ok {
-			continue
-		}
-
-		for _, apiRaw := range apis {
-			api, ok := apiRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if apiId, ok := api["apiId"].(string); ok && idSet[apiId] {
-				matched = append(matched, summary.ID)
-				break
-			}
+		if productReferencesApis(product, idSet) {
+			matched = append(matched, summary.ID)
 		}
 	}
 
