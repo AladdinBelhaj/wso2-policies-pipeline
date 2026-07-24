@@ -173,23 +173,9 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
 
 	if len(productIds) > 0 {
-		productFilter := promptApiProductChoice()
-		if productFilter != "" {
-			var filtered []string
-			for _, pid := range productIds {
-				pName := client.GetApiProductName(pid)
-				if strings.EqualFold(pName, productFilter) {
-					filtered = append(filtered, pid)
-				}
-			}
-			if len(filtered) == 0 {
-				log.Printf("API Product filter active: no API product matching %q was found among affected products", productFilter)
-			}
-			productIds = filtered
-		}
-
-		if len(productIds) > 0 {
-			policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies, policyFilter)
+		selectedProductIds := promptApiProductSelection(productIds)
+		if len(selectedProductIds) > 0 {
+			policy.RestoreApiProductPolicies(selectedProductIds, productSnapshots, allPolicies, policyFilter)
 		}
 	}
 }
@@ -229,39 +215,27 @@ func promptPolicyChoice() string {
 	return ""
 }
 
-// promptApiProductChoice asks the user whether to update all API products or a specific one.
-// Returns "" for all API products, or the entered API product name for a specific one.
-// If stdin is closed/EOF (like in CI/non-interactive settings), it defaults to all API products.
-func promptApiProductChoice() string {
+// promptApiProductSelection displays each fetched API product and asks the user whether to update it.
+// Prompt format: "Update API Product <name> [y/N]: "
+func promptApiProductSelection(productIds []string) []string {
 	reader := bufio.NewReader(os.Stdin)
+	var selected []string
 
-	fmt.Println("Would you like to update:")
-	fmt.Println("  1) All API products")
-	fmt.Println("  2) A specific API product")
-	fmt.Print("Enter choice [1/2]: ")
+	for _, pid := range productIds {
+		pName := client.GetApiProductName(pid)
+		fmt.Printf("Update API Product %s [y/N]: ", pName)
 
-	choice, err := reader.ReadString('\n')
-	if err != nil {
-		// Default to all API products on EOF/error
-		return ""
-	}
-	choice = strings.TrimSpace(choice)
-
-	if choice == "2" {
-		fmt.Print("Enter the API product name: ")
-		name, err := reader.ReadString('\n')
+		choice, err := reader.ReadString('\n')
 		if err != nil {
-			return ""
+			break
 		}
-		name = strings.TrimSpace(name)
-		if name == "" {
-			log.Fatal("API product name cannot be empty")
+		choice = strings.TrimSpace(choice)
+		if strings.EqualFold(choice, "y") || strings.EqualFold(choice, "yes") {
+			selected = append(selected, pid)
 		}
-		log.Printf("API Product filter active: only updating API product %q", name)
-		return name
 	}
 
-	return ""
+	return selected
 }
 
 func fetchApiIds(target string, isRollback bool) []string {
