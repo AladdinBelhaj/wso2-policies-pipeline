@@ -68,9 +68,10 @@ func executeRollback(target string, dryRun bool) {
 	}
 
 	for idx, apiId := range apiIds {
-		log.Printf("[%d/%d] Rolling back API %s...", idx+1, len(apiIds), apiId)
+		apiName := client.GetApiName(apiId)
+		log.Printf("[%d/%d] Rolling back API %s...", idx+1, len(apiIds), apiName)
 		if err := client.RollbackApiRevision(apiId); err != nil {
-			log.Printf("rollback failed for API %s: %v", apiId, err)
+			log.Printf("rollback failed for API %s: %v", apiName, err)
 		}
 	}
 
@@ -84,21 +85,22 @@ func executeRollback(target string, dryRun bool) {
 func buildRollbackPreview(apiIds []string, productIds []string) string {
 	preview := "Rollback preview:\n"
 	for idx, apiId := range apiIds {
-		log.Printf("[%d/%d] Generating rollback preview for API %s...", idx+1, len(apiIds), apiId)
+		apiName := client.GetApiName(apiId)
+		log.Printf("[%d/%d] Generating rollback preview for API %s...", idx+1, len(apiIds), apiName)
 		revisionIDs, err := client.GetRevisionIds(apiId)
 		if err != nil {
-			log.Printf("failed to fetch revisions for API %s: %v", apiId, err)
+			log.Printf("failed to fetch revisions for API %s: %v", apiName, err)
 			continue
 		}
 		if len(revisionIDs) <= 2 {
-			preview += fmt.Sprintf("  %s: cannot rollback (only %d revision(s))\n", apiId, len(revisionIDs))
+			preview += fmt.Sprintf("  %s: cannot rollback (only %d revision(s))\n", apiName, len(revisionIDs))
 			continue
 		}
 
 		targetRevisionID := revisionIDs[len(revisionIDs)-2]
 		currentPolicies := policy.ListCurrentPolicies(apiId)
 
-		preview += fmt.Sprintf("  %s:\n", apiId)
+		preview += fmt.Sprintf("  %s:\n", apiName)
 		preview += fmt.Sprintf("    Target revision: %s\n", targetRevisionID)
 		if len(currentPolicies) > 0 {
 			preview += "    Current policies that will be reverted:\n"
@@ -109,7 +111,11 @@ func buildRollbackPreview(apiIds []string, productIds []string) string {
 	}
 
 	if len(productIds) > 0 {
-		preview += fmt.Sprintf("  Also affects API Product(s): %s\n", strings.Join(productIds, ", "))
+		var productNames []string
+		for _, pid := range productIds {
+			productNames = append(productNames, client.GetApiProductName(pid))
+		}
+		preview += fmt.Sprintf("  Also affects API Product(s): %s\n", strings.Join(productNames, ", "))
 	}
 
 	return preview
@@ -127,19 +133,24 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	if dryRun {
 		preview := "Dry run: the following policy updates will be applied:\n"
 		for idx, apiID := range apiIds {
-			log.Printf("[%d/%d] Generating preview for API %s...", idx+1, len(apiIds), apiID)
+			apiName := client.GetApiName(apiID)
+			log.Printf("[%d/%d] Generating preview for API %s...", idx+1, len(apiIds), apiName)
 			changes := policy.PreviewApiPolicyUpdates(apiID, allPolicies)
 			if len(changes) == 0 {
-				preview += fmt.Sprintf("  %s: no changes\n", apiID)
+				preview += fmt.Sprintf("  %s: no changes\n", apiName)
 			} else {
-				preview += fmt.Sprintf("  %s:\n", apiID)
+				preview += fmt.Sprintf("  %s:\n", apiName)
 				for _, c := range changes {
 					preview += c + "\n"
 				}
 			}
 		}
 		if len(productIds) > 0 {
-			preview += fmt.Sprintf("  Also affects API Product(s): %s\n", strings.Join(productIds, ", "))
+			var productNames []string
+			for _, pid := range productIds {
+				productNames = append(productNames, client.GetApiProductName(pid))
+			}
+			preview += fmt.Sprintf("  Also affects API Product(s): %s\n", strings.Join(productNames, ", "))
 		}
 		if !client.ConfirmAction(preview) {
 			log.Println("operation cancelled")

@@ -52,25 +52,26 @@ func ConfirmAction(preview string) bool {
 
 // This function rolls back to the previous revision.
 func RollbackApiRevision(apiId string) error {
+	apiName := GetApiName(apiId)
 	revisionIDs, err := GetRevisionIds(apiId)
 	if err != nil {
 		return fmt.Errorf("fetch revisions for API %s: %w", apiId, err)
 	}
 
 	if len(revisionIDs) == 1 {
-		fmt.Printf("Cannot rollback API %s because there is only 1 revision\n", apiId)
+		fmt.Printf("Cannot rollback API %s because there is only 1 revision\n", apiName)
 		return nil
 	}
 
 	if len(revisionIDs) == 2 {
-		fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiId)
+		fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiName)
 		return nil
 	}
 
 	targetRevisionID := revisionIDs[len(revisionIDs)-2]
 	lastRevisionID := revisionIDs[len(revisionIDs)-1]
 
-	fmt.Printf("Rolling back API %s to revision %s\n", apiId, targetRevisionID)
+	fmt.Printf("Rolling back API %s to revision %s\n", apiName, targetRevisionID)
 	if err := RestoreRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("restore rollback target for API %s: %w", apiId, err)
 	}

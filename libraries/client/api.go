@@ -80,7 +80,7 @@ func ExtractApiPolicies(apiIds []string) map[string]map[string]any {
 	apiDetails := make(map[string]map[string]any, len(apiIds))
 
 	for idx, apiId := range apiIds {
-		log.Printf("[%d/%d] Fetching details for API %s...", idx+1, len(apiIds), apiId)
+		log.Printf("[%d/%d] Fetching details for API %s...", idx+1, len(apiIds), GetApiName(apiId))
 		var api map[string]any
 		data := GetApiDetailsJsonObject(apiId)
 		err := json.Unmarshal(data, &api)
@@ -229,7 +229,7 @@ func ExtractApiProductIds() []string {
 func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
 	details := make(map[string]map[string]any, len(productIds))
 	for idx, id := range productIds {
-		log.Printf("[%d/%d] Fetching details for API Product %s...", idx+1, len(productIds), id)
+		log.Printf("[%d/%d] Fetching details for API Product %s...", idx+1, len(productIds), GetApiProductName(id))
 		var product map[string]any
 		if err := json.Unmarshal(GetApiProductDetailsJsonObject(id), &product); err != nil {
 			log.Fatal(err)
@@ -316,4 +316,34 @@ func FindApiProductIdsUsingApis(apiIds []string) []string {
 	}
 
 	return matched
+}
+
+var apiNameCache map[string]string
+
+func GetApiName(apiId string) string {
+	if apiNameCache == nil {
+		apiNameCache = make(map[string]string)
+		for _, api := range ExtractApiSummaries() {
+			apiNameCache[api.ID] = api.Name
+		}
+	}
+	if name, ok := apiNameCache[apiId]; ok {
+		return name
+	}
+	return apiId
+}
+
+var apiProductNameCache map[string]string
+
+func GetApiProductName(productId string) string {
+	if apiProductNameCache == nil {
+		apiProductNameCache = make(map[string]string)
+		for _, p := range ExtractApiProductSummaries() {
+			apiProductNameCache[p.ID] = p.Name
+		}
+	}
+	if name, ok := apiProductNameCache[productId]; ok {
+		return name
+	}
+	return productId
 }

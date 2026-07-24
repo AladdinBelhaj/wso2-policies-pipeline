@@ -361,7 +361,8 @@ func snapshotSingleOperation(op map[string]interface{}) (OperationPolicySnapshot
 // source API's redeploy instead of being silently dropped.
 func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}) {
 	for idx, productId := range productIds {
-		log.Printf("[%d/%d] Restoring policies for API Product %s...", idx+1, len(productIds), productId)
+		productName := client.GetApiProductName(productId)
+		log.Printf("[%d/%d] Restoring policies for API Product %s...", idx+1, len(productIds), productName)
 		snapshotDetail, ok := preUpdateSnapshots[productId]
 		if !ok {
 			continue
@@ -372,9 +373,10 @@ func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[strin
 
 func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}) {
 	realByApi := SnapshotApiProductRealPolicies(snapshotDetail)
+	productName := client.GetApiProductName(productId)
 
 	if !hasAnyPolicies(realByApi) {
-		log.Printf("No real operation-level policies to restore for API Product %s", productId)
+		log.Printf("No real operation-level policies to restore for API Product %s", productName)
 		return
 	}
 
@@ -383,7 +385,7 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 	fresh := client.GetApiProductDetailsJsonObject(productId)
 	var freshDetail map[string]any
 	if err := json.Unmarshal(fresh, &freshDetail); err != nil {
-		log.Printf("failed to fetch current API Product %s: %v", productId, err)
+		log.Printf("failed to fetch current API Product %s: %v", productName, err)
 		return
 	}
 
@@ -395,10 +397,10 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 		log.Fatal(err)
 	}
 	if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
-		log.Printf("failed to restore policies for API Product %s: %v", productId, err)
+		log.Printf("failed to restore policies for API Product %s: %v", productName, err)
 		return
 	}
-	fmt.Printf("Restored real operation policies for API Product %s\n", productId)
+	fmt.Printf("Restored real operation policies for API Product %s\n", productName)
 }
 
 func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
