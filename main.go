@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -172,6 +173,41 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	if len(productIds) > 0 {
 		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
 	}
+}
+
+// promptPolicyChoice asks the user whether to update all policies or a specific one.
+// Returns "" for all policies, or the entered policy name for a specific one.
+// If stdin is closed/EOF (like in CI/non-interactive settings), it defaults to all policies.
+func promptPolicyChoice() string {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Would you like to update:")
+	fmt.Println("  1) All policies")
+	fmt.Println("  2) A specific policy")
+	fmt.Print("Enter choice [1/2]: ")
+
+	choice, err := reader.ReadString('\n')
+	if err != nil {
+		// Default to all policies on EOF/error
+		return ""
+	}
+	choice = strings.TrimSpace(choice)
+
+	if choice == "2" {
+		fmt.Print("Enter the policy name: ")
+		name, err := reader.ReadString('\n')
+		if err != nil {
+			return ""
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			log.Fatal("policy name cannot be empty")
+		}
+		log.Printf("Policy filter active: only updating policy %q", name)
+		return name
+	}
+
+	return ""
 }
 
 func fetchApiIds(target string, isRollback bool) []string {
