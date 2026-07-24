@@ -360,7 +360,8 @@ func snapshotSingleOperation(op map[string]interface{}) (OperationPolicySnapshot
 // operations, and PUTs the result back so real attachments survive the
 // source API's redeploy instead of being silently dropped.
 func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}) {
-	for _, productId := range productIds {
+	for idx, productId := range productIds {
+		log.Printf("[%d/%d] Restoring policies for API Product %s...", idx+1, len(productIds), productId)
 		snapshotDetail, ok := preUpdateSnapshots[productId]
 		if !ok {
 			continue

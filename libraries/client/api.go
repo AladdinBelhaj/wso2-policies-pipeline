@@ -79,7 +79,8 @@ func GetApiDetailsJsonObject(apiId string) []byte {
 func ExtractApiPolicies(apiIds []string) map[string]map[string]any {
 	apiDetails := make(map[string]map[string]any, len(apiIds))
 
-	for _, apiId := range apiIds {
+	for idx, apiId := range apiIds {
+		log.Printf("[%d/%d] Fetching details for API %s...", idx+1, len(apiIds), apiId)
 		var api map[string]any
 		data := GetApiDetailsJsonObject(apiId)
 		err := json.Unmarshal(data, &api)
@@ -227,7 +228,8 @@ func ExtractApiProductIds() []string {
 
 func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
 	details := make(map[string]map[string]any, len(productIds))
-	for _, id := range productIds {
+	for idx, id := range productIds {
+		log.Printf("[%d/%d] Fetching details for API Product %s...", idx+1, len(productIds), id)
 		var product map[string]any
 		if err := json.Unmarshal(GetApiProductDetailsJsonObject(id), &product); err != nil {
 			log.Fatal(err)
@@ -299,7 +301,8 @@ func FindApiProductIdsUsingApis(apiIds []string) []string {
 	productSummaries := ExtractApiProductSummaries()
 	var matched []string
 
-	for _, summary := range productSummaries {
+	for idx, summary := range productSummaries {
+		log.Printf("[%d/%d] Scanning API Product %s to check API references...", idx+1, len(productSummaries), summary.Name)
 		var product map[string]any
 		data := GetApiProductDetailsJsonObject(summary.ID)
 		if err := json.Unmarshal(data, &product); err != nil {

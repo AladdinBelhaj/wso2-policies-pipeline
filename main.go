@@ -67,7 +67,8 @@ func executeRollback(target string, dryRun bool) {
 		productSnapshots = client.ExtractApiProductPolicies(productIds)
 	}
 
-	for _, apiId := range apiIds {
+	for idx, apiId := range apiIds {
+		log.Printf("[%d/%d] Rolling back API %s...", idx+1, len(apiIds), apiId)
 		if err := client.RollbackApiRevision(apiId); err != nil {
 			log.Printf("rollback failed for API %s: %v", apiId, err)
 		}
@@ -82,7 +83,8 @@ func executeRollback(target string, dryRun bool) {
 
 func buildRollbackPreview(apiIds []string, productIds []string) string {
 	preview := "Rollback preview:\n"
-	for _, apiId := range apiIds {
+	for idx, apiId := range apiIds {
+		log.Printf("[%d/%d] Generating rollback preview for API %s...", idx+1, len(apiIds), apiId)
 		revisionIDs, err := client.GetRevisionIds(apiId)
 		if err != nil {
 			log.Printf("failed to fetch revisions for API %s: %v", apiId, err)
@@ -124,7 +126,8 @@ func executeUpdatePolicies(target string, dryRun bool) {
 
 	if dryRun {
 		preview := "Dry run: the following policy updates will be applied:\n"
-		for _, apiID := range apiIds {
+		for idx, apiID := range apiIds {
+			log.Printf("[%d/%d] Generating preview for API %s...", idx+1, len(apiIds), apiID)
 			changes := policy.PreviewApiPolicyUpdates(apiID, allPolicies)
 			if len(changes) == 0 {
 				preview += fmt.Sprintf("  %s: no changes\n", apiID)
