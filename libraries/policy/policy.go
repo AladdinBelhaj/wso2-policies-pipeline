@@ -18,13 +18,13 @@ const (
 var policyFlows = []string{"request", "response", "fault"}
 
 // This function iterates over the already-fetched API details, resolves policy IDs by name, and PUTs the result back.
-func UpdateApiPolicies(apiDetails map[string]map[string]any, allPolicies []map[string]interface{}) {
+func UpdateApiPolicies(apiDetails map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	for apiId, apiDetail := range apiDetails {
-		processSingleApi(apiId, apiDetail, allPolicies)
+		processSingleApi(apiId, apiDetail, allPolicies, policyFilter...)
 	}
 }
 
-func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[string]interface{}) {
+func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	apiName, ok := apiDetail["name"].(string)
 	if !ok {
 		log.Println("API name not found")
@@ -38,8 +38,8 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 		client.ExtractApiLevelPolicies(apiId)...,
 	)
 
-	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies)
-	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies) {
+	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...)
+	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...) {
 		modified = true
 	}
 
@@ -60,7 +60,7 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 	client.PrepareAndDeployRevision(apiId)
 }
 
-func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}) bool {
+func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
 	apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 	if !ok {
 		return false
@@ -68,14 +68,14 @@ func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string
 
 	modified := false
 	for _, flow := range policyFlows {
-		if resolvePoliciesInFlow(apiPoliciesBlock, flow, LevelAPI, policies) {
+		if resolvePoliciesInFlow(apiPoliciesBlock, flow, LevelAPI, policies, policyFilter...) {
 			modified = true
 		}
 	}
 	return modified
 }
 
-func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}) bool {
+func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
 	operations, ok := apiDetail["operations"].([]interface{})
 	if !ok {
 		return false
@@ -92,7 +92,7 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 			continue
 		}
 		for _, flow := range policyFlows {
-			if resolvePoliciesInFlow(opPolicies, flow, LevelOperation, policies) {
+			if resolvePoliciesInFlow(opPolicies, flow, LevelOperation, policies, policyFilter...) {
 				modified = true
 			}
 		}
@@ -109,10 +109,16 @@ func resolvePoliciesInFlow(
 	flow string,
 	level string,
 	allPolicies []map[string]interface{},
+	policyFilter ...string,
 ) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
 	if !ok {
 		return false
+	}
+
+	filter := ""
+	if len(policyFilter) > 0 {
+		filter = policyFilter[0]
 	}
 
 	changed := false
@@ -125,6 +131,10 @@ func resolvePoliciesInFlow(
 
 		policyName, ok := pol["policyName"].(string)
 		if !ok {
+			continue
+		}
+
+		if filter != "" && policyName != filter {
 			continue
 		}
 
@@ -201,7 +211,7 @@ func versionNumber(version string) (int, error) {
 	return strconv.Atoi(strings.TrimPrefix(version, "v"))
 }
 
-func collectOperationsPolicyChanges(operations []interface{}, apiScopedPolicies []map[string]interface{}) []string {
+func collectOperationsPolicyChanges(operations []interface{}, apiScopedPolicies []map[string]interface{}, policyFilter ...string) []string {
 	var changes []string
 	for _, opRaw := range operations {
 		op, ok := opRaw.(map[string]interface{})
@@ -213,7 +223,7 @@ func collectOperationsPolicyChanges(operations []interface{}, apiScopedPolicies 
 			continue
 		}
 		for _, flow := range policyFlows {
-			changes = append(changes, collectPolicyChanges(opPolicies, flow, LevelOperation, apiScopedPolicies)...)
+			changes = append(changes, collectPolicyChanges(opPolicies, flow, LevelOperation, apiScopedPolicies, policyFilter...)...)
 		}
 	}
 	return changes
@@ -221,7 +231,7 @@ func collectOperationsPolicyChanges(operations []interface{}, apiScopedPolicies 
 
 // PreviewApiPolicyUpdates returns human-readable descriptions of the policy
 // changes that would be applied to a single API, without modifying anything.
-func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{}) []string {
+func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{}, policyFilter ...string) []string {
 	var apiDetail map[string]any
 	if err := json.Unmarshal(client.GetApiDetailsJsonObject(apiId), &apiDetail); err != nil {
 		log.Fatal(err)
@@ -236,12 +246,12 @@ func PreviewApiPolicyUpdates(apiId string, allPolicies []map[string]interface{})
 
 	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
 		for _, flow := range policyFlows {
-			changes = append(changes, collectPolicyChanges(apiPoliciesBlock, flow, LevelAPI, apiScopedPolicies)...)
+			changes = append(changes, collectPolicyChanges(apiPoliciesBlock, flow, LevelAPI, apiScopedPolicies, policyFilter...)...)
 		}
 	}
 
 	if operations, ok := apiDetail["operations"].([]interface{}); ok {
-		changes = append(changes, collectOperationsPolicyChanges(operations, apiScopedPolicies)...)
+		changes = append(changes, collectOperationsPolicyChanges(operations, apiScopedPolicies, policyFilter...)...)
 	}
 
 	return changes
@@ -255,10 +265,16 @@ func collectPolicyChanges(
 	flow string,
 	level string,
 	allPolicies []map[string]interface{},
+	policyFilter ...string,
 ) []string {
 	flowList, ok := opPolicies[flow].([]interface{})
 	if !ok {
 		return nil
+	}
+
+	filter := ""
+	if len(policyFilter) > 0 {
+		filter = policyFilter[0]
 	}
 
 	var changes []string
@@ -271,6 +287,10 @@ func collectPolicyChanges(
 
 		policyName, ok := pol["policyName"].(string)
 		if !ok {
+			continue
+		}
+
+		if filter != "" && policyName != filter {
 			continue
 		}
 

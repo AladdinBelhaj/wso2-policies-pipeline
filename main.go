@@ -128,6 +128,8 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		return
 	}
 
+	policyFilter := promptPolicyChoice()
+
 	allPolicies := client.ExtractOperationPolicies()
 	productIds := client.FindApiProductIdsUsingApis(apiIds)
 
@@ -136,7 +138,7 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		for idx, apiID := range apiIds {
 			apiName := client.GetApiName(apiID)
 			log.Printf("[%d/%d] Generating preview for API %s...", idx+1, len(apiIds), apiName)
-			changes := policy.PreviewApiPolicyUpdates(apiID, allPolicies)
+			changes := policy.PreviewApiPolicyUpdates(apiID, allPolicies, policyFilter)
 			if len(changes) == 0 {
 				preview += fmt.Sprintf("  %s: no changes\n", apiName)
 			} else {
@@ -168,7 +170,7 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	}
 
 	apiDetails := client.ExtractApiPolicies(apiIds)
-	policy.UpdateApiPolicies(apiDetails, allPolicies)
+	policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
 
 	if len(productIds) > 0 {
 		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
