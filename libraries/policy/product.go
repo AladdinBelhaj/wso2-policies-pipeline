@@ -12,13 +12,13 @@ var productPolicyFlows = []string{"request", "response", "fault"}
 // This function iterates over the already-fetched API product details, resolves
 // operation policy IDs by name, and PUTs the result back with the two-step
 // strip/restore dance WSO2 needs to actually pick up the policy change.
-func UpdateApiProductPolicies(productDetails map[string]map[string]any, allPolicies []map[string]interface{}) {
+func UpdateApiProductPolicies(productDetails map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	for productId, productDetail := range productDetails {
-		processSingleApiProduct(productId, productDetail, allPolicies)
+		processSingleApiProduct(productId, productDetail, allPolicies, policyFilter...)
 	}
 }
 
-func processSingleApiProduct(productId string, productDetail map[string]any, allPolicies []map[string]interface{}) {
+func processSingleApiProduct(productId string, productDetail map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	productName, ok := productDetail["name"].(string)
 	if !ok {
 		log.Println("API product name not found")
@@ -27,7 +27,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 
 	fmt.Printf("Updating API Product: %s\n", productName)
 
-	modified := updateApiProductOperations(productDetail, allPolicies)
+	modified := updateApiProductOperations(productDetail, allPolicies, policyFilter...)
 	sanitizeApiProductOperations(productDetail)
 
 	if !modified {
@@ -48,7 +48,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 
 // // updateApiProductOperations walks apis[].operations[].operationPolicies and
 // resolves real (non-reflected) operation-level policy versions in place.
-func updateApiProductOperations(productDetail map[string]any, policies []map[string]interface{}) bool {
+func updateApiProductOperations(productDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
 	apis, ok := productDetail["apis"].([]interface{})
 	if !ok {
 		return false
@@ -60,14 +60,14 @@ func updateApiProductOperations(productDetail map[string]any, policies []map[str
 		if !ok {
 			continue
 		}
-		if updateSingleApiOperations(api, policies) {
+		if updateSingleApiOperations(api, policies, policyFilter...) {
 			modified = true
 		}
 	}
 	return modified
 }
 
-func updateSingleApiOperations(api map[string]interface{}, policies []map[string]interface{}) bool {
+func updateSingleApiOperations(api map[string]interface{}, policies []map[string]interface{}, policyFilter ...string) bool {
 	operations, ok := api["operations"].([]interface{})
 	if !ok {
 		return false
@@ -83,7 +83,7 @@ func updateSingleApiOperations(api map[string]interface{}, policies []map[string
 			continue
 		}
 		for _, flow := range productPolicyFlows {
-			if resolveProductPoliciesInFlow(opPolicies, flow, policies) {
+			if resolveProductPoliciesInFlow(opPolicies, flow, policies, policyFilter...) {
 				modified = true
 			}
 		}
@@ -102,6 +102,7 @@ func resolveProductPoliciesInFlow(
 	opPolicies map[string]interface{},
 	flow string,
 	allPolicies []map[string]interface{},
+	policyFilter ...string,
 ) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
 	if !ok {
@@ -115,7 +116,7 @@ func resolveProductPoliciesInFlow(
 		if !ok {
 			continue
 		}
-		if resolveSingleProductPolicy(pol, flow, allPolicies) {
+		if resolveSingleProductPolicy(pol, flow, allPolicies, policyFilter...) {
 			changed = true
 		}
 	}
@@ -123,13 +124,21 @@ func resolveProductPoliciesInFlow(
 	return changed
 }
 
-func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPolicies []map[string]interface{}) bool {
+func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPolicies []map[string]interface{}, policyFilter ...string) bool {
 	if policyType, _ := pol["policyType"].(string); policyType == "api" {
 		return false
 	}
 
 	policyName, ok := pol["policyName"].(string)
 	if !ok {
+		return false
+	}
+
+	filter := ""
+	if len(policyFilter) > 0 {
+		filter = policyFilter[0]
+	}
+	if filter != "" && policyName != filter {
 		return false
 	}
 
@@ -359,7 +368,7 @@ func snapshotSingleOperation(op map[string]interface{}) (OperationPolicySnapshot
 // state, merges the resolved real policies back into the matching
 // operations, and PUTs the result back so real attachments survive the
 // source API's redeploy instead of being silently dropped.
-func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}) {
+func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	for idx, productId := range productIds {
 		productName := client.GetApiProductName(productId)
 		log.Printf("[%d/%d] Restoring policies for API Product %s...", idx+1, len(productIds), productName)
@@ -367,11 +376,11 @@ func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[strin
 		if !ok {
 			continue
 		}
-		restoreSingleApiProduct(productId, snapshotDetail, allPolicies)
+		restoreSingleApiProduct(productId, snapshotDetail, allPolicies, policyFilter...)
 	}
 }
 
-func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}) {
+func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	realByApi := SnapshotApiProductRealPolicies(snapshotDetail)
 	productName := client.GetApiProductName(productId)
 
@@ -380,7 +389,7 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 		return
 	}
 
-	resolveSnapshots(realByApi, allPolicies)
+	resolveSnapshots(realByApi, allPolicies, policyFilter...)
 
 	fresh := client.GetApiProductDetailsJsonObject(productId)
 	var freshDetail map[string]any
@@ -400,7 +409,7 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 		log.Printf("failed to restore policies for API Product %s: %v", productName, err)
 		return
 	}
-	fmt.Printf("Restored real operation policies for API Product %s\n", productName)
+	fmt.Printf("Updated policies for API Product %s\n", productName)
 }
 
 func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
@@ -414,12 +423,12 @@ func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
 	return false
 }
 
-func resolveSnapshots(realByApi map[string][]OperationPolicySnapshot, allPolicies []map[string]interface{}) {
+func resolveSnapshots(realByApi map[string][]OperationPolicySnapshot, allPolicies []map[string]interface{}, policyFilter ...string) {
 	for _, snaps := range realByApi {
 		for i := range snaps {
 			for flow, policies := range snaps[i].Flows {
 				wrapped := map[string]interface{}{flow: toPolicyInterfaceSlice(policies)}
-				resolveProductPoliciesInFlow(wrapped, flow, allPolicies)
+				resolveProductPoliciesInFlow(wrapped, flow, allPolicies, policyFilter...)
 				snaps[i].Flows[flow] = fromPolicyInterfaceSlice(wrapped[flow].([]interface{}))
 			}
 		}

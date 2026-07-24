@@ -173,7 +173,24 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
 
 	if len(productIds) > 0 {
-		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
+		productFilter := promptApiProductChoice()
+		if productFilter != "" {
+			var filtered []string
+			for _, pid := range productIds {
+				pName := client.GetApiProductName(pid)
+				if strings.EqualFold(pName, productFilter) {
+					filtered = append(filtered, pid)
+				}
+			}
+			if len(filtered) == 0 {
+				log.Printf("API Product filter active: no API product matching %q was found among affected products", productFilter)
+			}
+			productIds = filtered
+		}
+
+		if len(productIds) > 0 {
+			policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies, policyFilter)
+		}
 	}
 }
 
@@ -206,6 +223,41 @@ func promptPolicyChoice() string {
 			log.Fatal("policy name cannot be empty")
 		}
 		log.Printf("Policy filter active: only updating policy %q", name)
+		return name
+	}
+
+	return ""
+}
+
+// promptApiProductChoice asks the user whether to update all API products or a specific one.
+// Returns "" for all API products, or the entered API product name for a specific one.
+// If stdin is closed/EOF (like in CI/non-interactive settings), it defaults to all API products.
+func promptApiProductChoice() string {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Would you like to update:")
+	fmt.Println("  1) All API products")
+	fmt.Println("  2) A specific API product")
+	fmt.Print("Enter choice [1/2]: ")
+
+	choice, err := reader.ReadString('\n')
+	if err != nil {
+		// Default to all API products on EOF/error
+		return ""
+	}
+	choice = strings.TrimSpace(choice)
+
+	if choice == "2" {
+		fmt.Print("Enter the API product name: ")
+		name, err := reader.ReadString('\n')
+		if err != nil {
+			return ""
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			log.Fatal("API product name cannot be empty")
+		}
+		log.Printf("API Product filter active: only updating API product %q", name)
 		return name
 	}
 
