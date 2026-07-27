@@ -33,7 +33,31 @@ func FilterApiIdsByName(apis []ApiSummary, target string) []string {
 	return matchedIDs
 }
 
+// FilterApiProductIdsByName filters API Product IDs by exact name match.
+func FilterApiProductIdsByName(products []ApiProductSummary, target string) []string {
+	target = strings.TrimSpace(target)
+	if target == "" || strings.EqualFold(target, "all") {
+		ids := make([]string, 0, len(products))
+		for _, p := range products {
+			if p.ID != "" {
+				ids = append(ids, p.ID)
+			}
+		}
+		return ids
+	}
 
+	matchedIDs := make([]string, 0)
+	for _, p := range products {
+		if p.ID == "" {
+			continue
+		}
+		if strings.EqualFold(p.Name, target) {
+			matchedIDs = append(matchedIDs, p.ID)
+		}
+	}
+
+	return matchedIDs
+}
 
 // This function prompts the user for confirmation before proceeding with an action (rollback)
 func ConfirmAction(preview string) bool {
@@ -104,6 +128,47 @@ func RollbackApiRevision(apiId string) error {
 	// if err := DeployRevision(apiId, newRevisionID); err != nil {
 	// 	return fmt.Errorf("deploy new revision for API %s: %w", apiId, err)
 	// }
+
+	return nil
+}
+
+// RollbackProductRevision rolls back an API Product to the previous revision.
+func RollbackProductRevision(productId string) error {
+	productName := GetApiProductName(productId)
+	revisionIDs, err := GetProductRevisionIds(productId)
+	if err != nil {
+		return fmt.Errorf("fetch revisions for API Product %s: %w", productId, err)
+	}
+
+	if len(revisionIDs) == 1 {
+		fmt.Printf("Cannot rollback API Product %s because there is only 1 revision\n", productName)
+		return nil
+	}
+
+	if len(revisionIDs) == 2 {
+		fmt.Printf("Cannot rollback API Product %s because there are only 2 revisions\n", productName)
+		return nil
+	}
+
+	targetRevisionID := revisionIDs[len(revisionIDs)-2]
+	lastRevisionID := revisionIDs[len(revisionIDs)-1]
+
+	fmt.Printf("Rolling back API Product %s to revision %s\n", productName, targetRevisionID)
+	if err := RestoreProductRevision(productId, targetRevisionID); err != nil {
+		return fmt.Errorf("restore rollback target for API Product %s: %w", productId, err)
+	}
+
+	if err := UndeployProductRevision(productId, lastRevisionID); err != nil {
+		return fmt.Errorf("undeploy current revision for API Product %s: %w", productId, err)
+	}
+
+	if err := DeployProductRevision(productId, targetRevisionID); err != nil {
+		return fmt.Errorf("deploy previous revision for API Product %s: %w", productId, err)
+	}
+
+	if err := DeleteProductRevision(productId, lastRevisionID); err != nil {
+		return fmt.Errorf("delete rolled back revision for API Product %s: %w", productId, err)
+	}
 
 	return nil
 }
