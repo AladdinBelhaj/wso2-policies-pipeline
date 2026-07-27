@@ -19,7 +19,7 @@ func Load() {
 	}
 
 	BaseURL = os.Getenv("BASE_URL")
-	Username = os.Getenv("USERNAME")
-	Password = os.Getenv("PASSWORD")
+	Username = os.Getenv("WSO2_USERNAME")
+	Password = os.Getenv("WSO2_PASSWORD")
 	Vhost = os.Getenv("VHOST")
 }
