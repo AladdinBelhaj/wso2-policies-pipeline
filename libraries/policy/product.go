@@ -44,6 +44,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 		log.Printf("failed to update API Product %s: %v", productId, err)
 		return
 	}
+	client.PrepareAndDeployProductRevision(productId)
 }
 
 // // updateApiProductOperations walks apis[].operations[].operationPolicies and
@@ -410,6 +411,7 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 		return
 	}
 	fmt.Printf("Updated policies for API Product %s\n", productName)
+	client.PrepareAndDeployProductRevision(productId)
 }
 
 func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
