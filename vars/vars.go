@@ -10,6 +10,7 @@ import (
 var BaseURL string
 var Username string
 var Password string
+var Vhost string
 
 func Load() {
 	// Open the .env file if it exists
@@ -32,4 +33,5 @@ func Load() {
 	BaseURL = os.Getenv("BASE_URL")
 	Username = os.Getenv("USERNAME")
 	Password = os.Getenv("PASSWORD")
+	Vhost = os.Getenv("VHOST")
 }

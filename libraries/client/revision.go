@@ -163,13 +163,13 @@ func CreateRevision(apiId string) string {
 
 // This function deploys a revision.
 func DeployRevision(apiId string, revisionId string) error {
-	payload := `[
-		{
-			"name": "Default",
-			"vhost": "localhost",
-			"displayOnDevportal": true
-		}
-	]`
+	payload := fmt.Sprintf(`[
+    {
+        "name": "Default",
+        "vhost": "%s",
+        "displayOnDevportal": true
+    }
+]`, vars.Vhost)
 
 	cmd := newCurlCmd(
 		"-X", "POST",
