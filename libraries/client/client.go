@@ -2,10 +2,11 @@
 package client
 
 import (
+	"bytes"
+	"crypto/tls"
 	"fmt"
-	"os/exec"
-	"runtime"
-	"strings"
+	"io"
+	"net/http"
 	"wso2/scripts/vars"
 )
 
@@ -19,34 +20,56 @@ type ApiProductSummary struct {
 	Name string
 }
 
-const (
-	contentTypeJSON  = "Content-Type: application/json"
-	httpStatusFormat = "\nHTTP_STATUS:%{http_code}"
-)
+const contentTypeJSON = "application/json"
 
-// This function creates a new exec.Cmd for a curl command with the provided arguments to interact with WSO2 API Manager.
-func newCurlCmd(args ...string) *exec.Cmd {
-	curlArgs := append([]string{"-u", vars.Username + ":" + vars.Password}, args...)
-
-	curlPath := "/usr/bin/curl"
-	if runtime.GOOS == "windows" {
-		curlPath = `C:\Windows\System32\curl.exe`
-	}
-
-	return exec.Command(curlPath, curlArgs...)
+// httpClient is shared across all requests to the WSO2 Publisher API.
+// InsecureSkipVerify mirrors the previous curl -k behavior.
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
 }
 
-// This function parses the output of a curl command to extract the HTTP status code and response body.
-func parseCurlStatus(output []byte, action string) (string, string, error) {
-	outStr := string(output)
-	idx := strings.LastIndex(outStr, "HTTP_STATUS:")
-	if idx == -1 {
-		return "", "", fmt.Errorf("%s: no status code in output: %s", action, strings.TrimSpace(outStr))
+// newRequest builds an HTTP request with basic auth configured for the WSO2 API.
+func newRequest(method, url string, body []byte) (*http.Request, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
 	}
 
-	statusCode := strings.TrimSpace(outStr[idx+len("HTTP_STATUS:"):])
-	body := strings.TrimSpace(outStr[:idx])
-	return statusCode, body, nil
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	req.SetBasicAuth(vars.Username, vars.Password)
+	if body != nil {
+		req.Header.Set("Content-Type", contentTypeJSON)
+	}
+
+	return req, nil
+}
+
+// doRequest executes an HTTP request against the WSO2 API and returns the
+// status code and response body.
+func doRequest(method, url string, payload []byte) (int, []byte, error) {
+	req, err := newRequest(method, url, payload)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s %s: failed to build request: %v", method, url, err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s %s: request failed: %v", method, url, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s %s: failed to read response: %v", method, url, err)
+	}
+
+	return resp.StatusCode, respBody, nil
 }
 
 // This function extracts policies from the JSON object and stores them in a map

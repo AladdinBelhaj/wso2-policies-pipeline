@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os/exec"
-	"strings"
+	"net/http"
 	"wso2/scripts/vars"
 )
 
@@ -18,13 +17,10 @@ const (
 
 // This function verifies if the revisions number has reached 5 or not.
 func ReviewRevisionsNumber(apiId string) (string, bool) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId+PathRevision, "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
+	body := getJSON(vars.BaseURL + PathAPI + apiId + PathRevision)
 
 	var data map[string]any
-	if err := json.Unmarshal(jsonObject, &data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		log.Fatal(err)
 	}
 
@@ -40,13 +36,17 @@ func ReviewRevisionsNumber(apiId string) (string, bool) {
 
 // This function fetches the ID of each revision.
 func GetRevisionIds(apiId string) ([]string, error) {
-	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId+PathRevision, "-k").Output()
+	url := vars.BaseURL + PathAPI + apiId + PathRevision
+	statusCode, body, err := doRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, fmt.Errorf("GET %s failed with HTTP %d: %s", url, statusCode, body)
+	}
 
 	var data map[string]any
-	if err := json.Unmarshal(jsonObject, &data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}
 
@@ -69,39 +69,26 @@ func GetRevisionIds(apiId string) ([]string, error) {
 	return revisions, nil
 }
 
-// This function runs a curl command for a revision action, checks for a 2xx
+// This function performs a revision action request, checks for a 2xx
 // status, and returns the response body or an error.
-func executeRevisionCurl(cmd *exec.Cmd, actionDesc string) (string, error) {
-	output, err := cmd.CombinedOutput()
+func executeRevisionRequest(method, url string, payload []byte, actionDesc string) (string, error) {
+	statusCode, body, err := doRequest(method, url, payload)
 	if err != nil {
-		return "", fmt.Errorf("%s curl error: %v, output: %s", actionDesc, err, output)
+		return "", fmt.Errorf("%s error: %v", actionDesc, err)
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return "", fmt.Errorf("%s failed with HTTP %d: %s", actionDesc, statusCode, body)
 	}
 
-	statusCode, body, err := parseCurlStatus(output, actionDesc)
-	if err != nil {
-		return "", err
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		return "", fmt.Errorf("%s failed with HTTP %s: %s", actionDesc, statusCode, body)
-	}
-
-	return body, nil
+	return string(body), nil
 }
 
 // This function undeploys a revision before deleting it
 func UndeployRevision(apiId string, revisionId string) error {
-	body := `[{"name":"Default","displayOnDevportal":false}]`
+	payload := []byte(`[{"name":"Default","displayOnDevportal":false}]`)
 
-	cmd := newCurlCmd(
-		"-X", "POST",
-		vars.BaseURL+PathAPI+apiId+PathUndeployRevision+revisionId,
-		"-H", contentTypeJSON,
-		"-d", body,
-		"-k",
-		"-s", "-w", httpStatusFormat,
-	)
-
-	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("undeploy revision %s", revisionId)); err != nil {
+	url := vars.BaseURL + PathAPI + apiId + PathUndeployRevision + revisionId
+	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("undeploy revision %s", revisionId)); err != nil {
 		return err
 	}
 
@@ -111,13 +98,8 @@ func UndeployRevision(apiId string, revisionId string) error {
 
 // This function deletes a revision without attempting to undeploy it first
 func DeleteRevision(apiId string, revisionId string) error {
-	cmd := newCurlCmd(
-		"-X", "DELETE",
-		vars.BaseURL+PathAPI+apiId+PathRevision+revisionId,
-		"-k",
-		"-s", "-w", httpStatusFormat)
-
-	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("delete revision %s", revisionId)); err != nil {
+	url := vars.BaseURL + PathAPI + apiId + PathRevision + revisionId
+	if _, err := executeRevisionRequest(http.MethodDelete, url, nil, fmt.Sprintf("delete revision %s", revisionId)); err != nil {
 		return err
 	}
 
@@ -128,29 +110,18 @@ func DeleteRevision(apiId string, revisionId string) error {
 // This function creates a revision.
 func CreateRevision(apiId string) string {
 	payload := []byte(`{}`)
-	cmd := newCurlCmd(
-		"-X", "POST",
-		vars.BaseURL+PathAPI+apiId+PathRevision,
-		"-H", contentTypeJSON,
-		"-d", string(payload),
-		"-k",
-		"-s", "-w", httpStatusFormat)
+	url := vars.BaseURL + PathAPI + apiId + PathRevision
 
-	out, err := cmd.CombinedOutput()
+	statusCode, body, err := doRequest(http.MethodPost, url, payload)
 	if err != nil {
-		log.Fatalf("create revision curl error: %v, output: %s", err, out)
+		log.Fatalf("create revision request error: %v", err)
 	}
-
-	statusCode, body, err := parseCurlStatus(out, fmt.Sprintf("create revision for API %s", apiId))
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !strings.HasPrefix(statusCode, "2") {
-		log.Fatalf("create revision failed with HTTP %s: %s", statusCode, body)
+	if statusCode < 200 || statusCode >= 300 {
+		log.Fatalf("create revision failed with HTTP %d: %s", statusCode, body)
 	}
 
 	var data map[string]any
-	if err := json.Unmarshal([]byte(body), &data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		log.Fatalf("create revision response parse error: %v, body: %s", err, body)
 	}
 
@@ -163,23 +134,16 @@ func CreateRevision(apiId string) string {
 
 // This function deploys a revision.
 func DeployRevision(apiId string, revisionId string) error {
-	payload := fmt.Sprintf(`[
+	payload := []byte(fmt.Sprintf(`[
     {
         "name": "Default",
         "vhost": "%s",
         "displayOnDevportal": true
     }
-]`, vars.Vhost)
+]`, vars.Vhost))
 
-	cmd := newCurlCmd(
-		"-X", "POST",
-		vars.BaseURL+PathAPI+apiId+PathDeployRevision+revisionId,
-		"-H", contentTypeJSON,
-		"-d", payload,
-		"-k",
-		"-s", "-w", httpStatusFormat)
-
-	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("deploy revision %s", revisionId)); err != nil {
+	url := vars.BaseURL + PathAPI + apiId + PathDeployRevision + revisionId
+	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("deploy revision %s", revisionId)); err != nil {
 		return err
 	}
 
@@ -189,15 +153,12 @@ func DeployRevision(apiId string, revisionId string) error {
 
 // This function restores a previous revision to the API.
 func RestoreRevision(apiId string, revisionId string) error {
+	// Empty (non-nil) payload preserves the original curl behavior of sending
+	// the Content-Type header with no body.
+	payload := []byte{}
 
-	cmd := newCurlCmd(
-		"-X", "POST",
-		vars.BaseURL+PathAPI+apiId+PathRestoreRevision+revisionId,
-		"-H", contentTypeJSON,
-		"-k",
-		"-s", "-w", httpStatusFormat)
-
-	if _, err := executeRevisionCurl(cmd, fmt.Sprintf("restore revision %s", revisionId)); err != nil {
+	url := vars.BaseURL + PathAPI + apiId + PathRestoreRevision + revisionId
+	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("restore revision %s", revisionId)); err != nil {
 		return err
 	}
 
