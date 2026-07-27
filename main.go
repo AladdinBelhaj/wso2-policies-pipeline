@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 	"strings"
-	"wso2/scripts/libraries/client"
-	"wso2/scripts/libraries/policy"
-	"wso2/scripts/vars"
+	"wso2/pctl/libraries/client"
+	"wso2/pctl/libraries/policy"
+	"wso2/pctl/vars"
 )
 
 func main() {

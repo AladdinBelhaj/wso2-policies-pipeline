@@ -1,5 +1,5 @@
-module wso2/scripts
+module wso2/pctl
 
 go 1.26.4
 
-require github.com/joho/godotenv v1.5.1 // indirect
+require github.com/joho/godotenv v1.5.1

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	"wso2/scripts/vars"
+	"wso2/pctl/vars"
 )
 
 type ApiSummary struct {

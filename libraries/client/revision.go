@@ -6,7 +6,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
-	"wso2/scripts/vars"
+	"wso2/pctl/vars"
 )
 
 const (
