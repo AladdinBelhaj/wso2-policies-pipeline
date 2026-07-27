@@ -36,23 +36,21 @@ func Load() {
 		log.Printf("Warning: could not create config directory %s: %v", configDir, err)
 	}
 
-	viper.SetConfigFile(ConfigPath)
-	viper.SetConfigType("yaml")
+	v := viper.New()
+	v.SetConfigFile(ConfigPath)
+	v.SetConfigType("yaml")
 
 	// Set default values
-	viper.SetDefault("vhost", "localhost:9443")
-	viper.SetDefault("username", "admin")
-	viper.SetDefault("password", "admin")
-	viper.SetDefault("base_url", "https://localhost:9443")
-
-	// Enable environment variable override
-	viper.AutomaticEnv()
+	v.SetDefault("vhost", "localhost")
+	v.SetDefault("username", "admin")
+	v.SetDefault("password", "admin")
+	v.SetDefault("base_url", "https://localhost:9443/api/am/publisher/v4")
 
 	if _, err := os.Stat(ConfigPath); os.IsNotExist(err) {
-		defaultConfigContent := []byte(`vhost: "localhost:9443"
+		defaultConfigContent := []byte(`vhost: "localhost"
 username: "admin"
 password: "admin"
-base_url: "https://localhost:9443"
+base_url: "https://localhost:9443/api/am/publisher/v4"
 `)
 		if err := os.WriteFile(ConfigPath, defaultConfigContent, 0644); err != nil {
 			log.Printf("Warning: could not create default config file %s: %v", ConfigPath, err)
@@ -61,12 +59,12 @@ base_url: "https://localhost:9443"
 		}
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		log.Printf("Error reading config file %s: %v", ConfigPath, err)
 	}
 
-	Vhost = viper.GetString("vhost")
-	Username = viper.GetString("username")
-	Password = viper.GetString("password")
-	BaseURL = viper.GetString("base_url")
+	Vhost = v.GetString("vhost")
+	Username = v.GetString("username")
+	Password = v.GetString("password")
+	BaseURL = v.GetString("base_url")
 }
