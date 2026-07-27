@@ -2,10 +2,9 @@
 package vars
 
 import (
-"bufio"
-"log"
-"os"
-"strings"
+	"bufio"
+	"os"
+	"strings"
 )
 
 var BaseURL string
@@ -13,33 +12,24 @@ var Username string
 var Password string
 
 func Load() {
-//	Open the .env file
-envFile, err := os.Open("./.env")
-//	check for errors
-if err !=  nil {
-log.Fatalln(err)
-}
+	// Open the .env file if it exists
+	if envFile, err := os.Open("./.env"); err == nil {
+		defer envFile.Close()
+		scanner := bufio.NewScanner(envFile)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			envVar := strings.SplitN(line, "=", 2)
+			if len(envVar) == 2 {
+				os.Setenv(envVar[0], envVar[1])
+			}
+		}
+	}
 
- //	defer closing the file until the function exits
-defer envFile.Close()
-
-// create a new scanner to read each row
-scanner := bufio.NewScanner(envFile)
-
-//	 loop through each row of the .env file
-for scanner.Scan() {
-//	split the text on the equal sign to get the key and value
-envVar := strings.Split(scanner.Text(), "=")
-//	os.Setenv takes in a key and a value which are both strings
-os.Setenv(envVar[0], envVar[1])
-}
-//	check for errors with scanner.Scan
-if err := scanner.Err(); err !=  nil {
-log.Fatal(err)
-}
-// assign the environment variable using the os.Getenv method
-BaseURL = os.Getenv("BASE_URL")
-Username = os.Getenv("USERNAME")
-Password = os.Getenv("PASSWORD")
-
+	// assign environment variables
+	BaseURL = os.Getenv("BASE_URL")
+	Username = os.Getenv("USERNAME")
+	Password = os.Getenv("PASSWORD")
 }
