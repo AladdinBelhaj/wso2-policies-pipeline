@@ -7,7 +7,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"wso2/scripts/libraries/client"
+	"wso2/pctl/libraries/client"
 )
 
 const (

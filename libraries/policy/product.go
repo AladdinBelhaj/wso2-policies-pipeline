@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"wso2/scripts/libraries/client"
+	"wso2/pctl/libraries/client"
 )
 
 var productPolicyFlows = []string{"request", "response", "fault"}

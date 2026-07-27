@@ -1,4 +1,4 @@
-module wso2/scripts
+module wso2/pctl
 
 go 1.26.4
 

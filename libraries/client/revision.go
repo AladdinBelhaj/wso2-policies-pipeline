@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"wso2/scripts/vars"
+	"wso2/pctl/vars"
 )
 
 const (
