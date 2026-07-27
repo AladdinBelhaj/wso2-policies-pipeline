@@ -274,7 +274,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime/pprof"
 	"strings"
 
 	"wso2/pctl/libraries/client"
@@ -331,17 +330,6 @@ func init() {
 }
 
 func main() {
-	f, err := os.Create("cpu.prof")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	if err := pprof.StartCPUProfile(f); err != nil {
-		log.Fatal(err)
-	}
-	defer pprof.StopCPUProfile()
-
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
