@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime/pprof"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"wso2/pctl/libraries/client"
 	"wso2/pctl/libraries/policy"
 	"wso2/pctl/vars"
+
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -61,17 +61,6 @@ func init() {
 }
 
 func main() {
-	f, err := os.Create("cpu.prof")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	if err := pprof.StartCPUProfile(f); err != nil {
-		log.Fatal(err)
-	}
-	defer pprof.StopCPUProfile()
-
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -108,14 +97,6 @@ func executeRollback(target string, dryRun bool) {
 		return
 	}
 
-	// Snapshot product state BEFORE the API rollback, since rolling back
-	// a revision of the source API wipes the product's real operation-level
-	// policy attachments as a side effect.
-	var productSnapshots map[string]map[string]any
-	if len(productIds) > 0 {
-		productSnapshots = client.ExtractApiProductPolicies(productIds)
-	}
-
 	for idx, apiId := range apiIds {
 		apiName := client.GetApiName(apiId)
 		log.Printf("[%d/%d] Rolling back API %s...", idx+1, len(apiIds), apiName)
@@ -124,11 +105,7 @@ func executeRollback(target string, dryRun bool) {
 		}
 	}
 
-	// Restore product policies & rollback product revisions
 	if len(productIds) > 0 {
-		allPolicies := client.ExtractOperationPolicies()
-		policy.RestoreApiProductPolicies(productIds, productSnapshots, allPolicies)
-
 		for idx, productId := range productIds {
 			productName := client.GetApiProductName(productId)
 			log.Printf("[%d/%d] Rolling back API Product %s...", idx+1, len(productIds), productName)
@@ -149,7 +126,7 @@ func buildRollbackPreview(apiIds []string, productIds []string) string {
 			log.Printf("failed to fetch revisions for API %s: %v", apiName, err)
 			continue
 		}
-		if len(revisionIDs) <= 2 {
+		if len(revisionIDs) <= 1 {
 			preview += fmt.Sprintf("  %s: cannot rollback (only %d revision(s))\n", apiName, len(revisionIDs))
 			continue
 		}
@@ -176,7 +153,7 @@ func buildRollbackPreview(apiIds []string, productIds []string) string {
 		for _, pid := range productIds {
 			pName := client.GetApiProductName(pid)
 			revisions, err := client.GetProductRevisionIds(pid)
-			if err != nil || len(revisions) <= 2 {
+			if err != nil || len(revisions) <= 1 {
 				preview += fmt.Sprintf("    %s: cannot rollback (only %d revision(s))\n", pName, len(revisions))
 			} else {
 				targetRev := revisions[len(revisions)-2]

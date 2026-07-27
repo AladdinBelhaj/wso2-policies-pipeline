@@ -30,20 +30,18 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 	modified := updateApiProductOperations(productDetail, allPolicies, policyFilter...)
 	sanitizeApiProductOperations(productDetail)
 
-	if !modified {
-		log.Printf("No changes detected for API Product %s. Skipping update.", productId)
-		return
+	if modified {
+		// Perform a single PUT update with operations and updated policies included.
+		updatedJson, err := json.Marshal(productDetail)
+		if err != nil {
+			log.Fatalf("failed to marshal API Product JSON: %v", err)
+		}
+		if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
+			log.Printf("failed to update API Product %s: %v", productName, err)
+			return
+		}
 	}
 
-	// Perform a single PUT update with operations and updated policies included.
-	updatedJson, err := json.Marshal(productDetail)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
-		log.Printf("failed to update API Product %s: %v", productId, err)
-		return
-	}
 	client.PrepareAndDeployProductRevision(productId)
 }
 

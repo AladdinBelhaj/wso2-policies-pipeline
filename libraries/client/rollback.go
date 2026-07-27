@@ -82,13 +82,8 @@ func RollbackApiRevision(apiId string) error {
 		return fmt.Errorf("fetch revisions for API %s: %w", apiId, err)
 	}
 
-	if len(revisionIDs) == 1 {
-		fmt.Printf("Cannot rollback API %s because there is only 1 revision\n", apiName)
-		return nil
-	}
-
-	if len(revisionIDs) == 2 {
-		fmt.Printf("Cannot rollback API %s because there are only 2 revisions\n", apiName)
+	if len(revisionIDs) <= 1 {
+		fmt.Printf("Cannot rollback API %s because there is only %d revision\n", apiName, len(revisionIDs))
 		return nil
 	}
 
@@ -96,38 +91,25 @@ func RollbackApiRevision(apiId string) error {
 	lastRevisionID := revisionIDs[len(revisionIDs)-1]
 
 	fmt.Printf("Rolling back API %s to revision %s\n", apiName, targetRevisionID)
+	// 1. Restore state of target revision (e.g. revision 3)
 	if err := RestoreRevision(apiId, targetRevisionID); err != nil {
 		return fmt.Errorf("restore rollback target for API %s: %w", apiId, err)
 	}
 
+	// 2. Undeploy current revision (e.g. revision 4)
 	if err := UndeployRevision(apiId, lastRevisionID); err != nil {
-		return fmt.Errorf("\nundeploy oldest revision for API %s: %w", apiId, err)
+		return fmt.Errorf("undeploy current revision for API %s: %w", apiId, err)
 	}
 
-	if err := DeleteRevision(apiId, lastRevisionID); err != nil {
-		return fmt.Errorf("\ndelete oldest revision for API %s: %w", apiId, err)
-	}
-
+	// 3. Deploy target revision (e.g. revision 3)
 	if err := DeployRevision(apiId, targetRevisionID); err != nil {
-		return fmt.Errorf("deploy new revision for API %s: %w", apiId, err)
+		return fmt.Errorf("deploy target revision for API %s: %w", apiId, err)
 	}
 
-	// if oldestRevision, found := ReviewRevisionsNumber(apiId); found {
-	// 	fmt.Printf("Found 5 revisions; deleting oldest revision %s to make room for new revision\n", oldestRevision)
-	// 	if err := DeleteRevision(apiId, oldestRevision); err != nil {
-	// 		return fmt.Errorf("delete oldest revision for API %s: %w", apiId, err)
-	// 	}
-	// }
-
-	// newRevisionID := CreateRevision(apiId)
-	// if newRevisionID == "" {
-	// 	return fmt.Errorf("failed to create a new revision for API %s", apiId)
-	// }
-
-	// fmt.Printf("Created new revision %s from restored state; deploying it\n", newRevisionID)
-	// if err := DeployRevision(apiId, newRevisionID); err != nil {
-	// 	return fmt.Errorf("deploy new revision for API %s: %w", apiId, err)
-	// }
+	// 4. Delete current revision (e.g. revision 4)
+	if err := DeleteRevision(apiId, lastRevisionID); err != nil {
+		return fmt.Errorf("delete rolled back revision for API %s: %w", apiId, err)
+	}
 
 	return nil
 }
@@ -140,13 +122,8 @@ func RollbackProductRevision(productId string) error {
 		return fmt.Errorf("fetch revisions for API Product %s: %w", productId, err)
 	}
 
-	if len(revisionIDs) == 1 {
-		fmt.Printf("Cannot rollback API Product %s because there is only 1 revision\n", productName)
-		return nil
-	}
-
-	if len(revisionIDs) == 2 {
-		fmt.Printf("Cannot rollback API Product %s because there are only 2 revisions\n", productName)
+	if len(revisionIDs) <= 1 {
+		fmt.Printf("Cannot rollback API Product %s because there is only %d revision\n", productName, len(revisionIDs))
 		return nil
 	}
 
@@ -154,18 +131,22 @@ func RollbackProductRevision(productId string) error {
 	lastRevisionID := revisionIDs[len(revisionIDs)-1]
 
 	fmt.Printf("Rolling back API Product %s to revision %s\n", productName, targetRevisionID)
+	// 1. Restore state of target revision
 	if err := RestoreProductRevision(productId, targetRevisionID); err != nil {
 		return fmt.Errorf("restore rollback target for API Product %s: %w", productId, err)
 	}
 
+	// 2. Undeploy current revision
 	if err := UndeployProductRevision(productId, lastRevisionID); err != nil {
 		return fmt.Errorf("undeploy current revision for API Product %s: %w", productId, err)
 	}
 
+	// 3. Deploy target revision
 	if err := DeployProductRevision(productId, targetRevisionID); err != nil {
-		return fmt.Errorf("deploy previous revision for API Product %s: %w", productId, err)
+		return fmt.Errorf("deploy target revision for API Product %s: %w", productId, err)
 	}
 
+	// 4. Delete current revision
 	if err := DeleteProductRevision(productId, lastRevisionID); err != nil {
 		return fmt.Errorf("delete rolled back revision for API Product %s: %w", productId, err)
 	}

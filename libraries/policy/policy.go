@@ -43,18 +43,15 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 		modified = true
 	}
 
-	if !modified {
-		log.Printf("No changes detected for API %s. Skipping update and deployment.", apiId)
-		return
-	}
-
-	updatedJson, err := json.Marshal(apiDetail)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
-		log.Printf("failed to update API %s: %v", apiId, err)
-		return
+	if modified {
+		updatedJson, err := json.Marshal(apiDetail)
+		if err != nil {
+			log.Fatalf("failed to marshal API JSON: %v", err)
+		}
+		if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
+			log.Printf("failed to update API %s: %v", apiName, err)
+			return
+		}
 	}
 
 	client.PrepareAndDeployRevision(apiId)
