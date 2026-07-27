@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
+	"net/http"
 	"wso2/pctl/vars"
 )
 
@@ -13,14 +13,23 @@ const (
 	PathOperationPolicies = "/operation-policies?limit=100"
 )
 
-// This function executes a curl command to fetch the JSON object from the /apis endpoint.
+// This function executes an HTTP GET to fetch the JSON object from the /apis endpoint.
 func getApiJsonObject() []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+"/apis", "-k").Output()
+	return getJSON(vars.BaseURL + "/apis")
+}
+
+// getJSON performs a GET request and fatals with the status code and body if
+// the response was not a 2xx, instead of returning a body that will fail to
+// parse in a confusing way further down the call chain.
+func getJSON(url string) []byte {
+	statusCode, body, err := doRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return jsonObject
+	if statusCode < 200 || statusCode >= 300 {
+		log.Fatalf("GET %s failed with HTTP %d: %s", url, statusCode, body)
+	}
+	return body
 }
 
 // This function iterates through the JSON object and fetches the ID and name of each API.
@@ -68,11 +77,7 @@ func ExtractApiIds() []string {
 
 // This function extracts the API IDs from the JSON object returned by the /apis endpoint.
 func GetApiDetailsJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId, "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsonObject
+	return getJSON(vars.BaseURL + PathAPI + apiId)
 }
 
 // This function iterates through the list of API IDs and fetches the full details for each API.
@@ -96,11 +101,7 @@ func ExtractApiPolicies(apiIds []string) map[string]map[string]any {
 
 // This function fetches all common operation policies.
 func getOperationPoliciesJsonObject() []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+PathOperationPolicies, "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsonObject
+	return getJSON(vars.BaseURL + PathOperationPolicies)
 }
 
 // This function extracts the policies and the metadata from the JSON objects.
@@ -117,11 +118,7 @@ func ExtractOperationPolicies() []map[string]interface{} {
 
 // This function fetches API level policies.
 func getApiLevelPoliciesJsonObject(apiId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+PathAPI+apiId+PathOperationPolicies, "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsonObject
+	return getJSON(vars.BaseURL + PathAPI + apiId + PathOperationPolicies)
 }
 
 // This function fetches and normalizes the API-specific policies for a single API.
@@ -138,49 +135,27 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
 func PutApiUpdate(apiId string, payload []byte) error {
-	cmd := newCurlCmd(
-		"-X", "PUT",
-		vars.BaseURL+PathAPI+apiId,
-		"-H", contentTypeJSON,
-		"-d", "@-",
-		"-k",
-		"-s", "-w", httpStatusFormat)
-
-	cmd.Stdin = strings.NewReader(string(payload))
-
-	output, err := cmd.CombinedOutput()
+	url := vars.BaseURL + PathAPI + apiId
+	statusCode, body, err := doRequest(http.MethodPut, url, payload)
 	if err != nil {
-		return fmt.Errorf("PUT /apis/%s curl error: %v, output: %s", apiId, err, output)
+		return fmt.Errorf("PUT /apis/%s error: %v", apiId, err)
 	}
 
-	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("PUT /apis/%s", apiId))
-	if err != nil {
-		return err
-	}
-	if strings.HasPrefix(statusCode, "2") {
-		fmt.Printf("PUT /apis/%s: OK (HTTP %s)\n", apiId, statusCode)
+	if statusCode >= 200 && statusCode < 300 {
+		fmt.Printf("PUT /apis/%s: OK (HTTP %d)\n", apiId, statusCode)
 		return nil
 	}
 
-	fmt.Printf("PUT /apis/%s: FAILED (HTTP %s) - %s\n", apiId, statusCode, body)
-	return fmt.Errorf("HTTP %s", statusCode)
+	fmt.Printf("PUT /apis/%s: FAILED (HTTP %d) - %s\n", apiId, statusCode, body)
+	return fmt.Errorf("HTTP %d", statusCode)
 }
 
 func getApiProductJsonObject() []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products", "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return jsonObject
+	return getJSON(vars.BaseURL + "/api-products")
 }
 
 func GetApiProductDetailsJsonObject(apiProductId string) []byte {
-	jsonObject, err := newCurlCmd(vars.BaseURL+"/api-products/"+apiProductId, "-k").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsonObject
+	return getJSON(vars.BaseURL + "/api-products/" + apiProductId)
 }
 
 // This function iterates through the JSON object and fetches the ID and name of each API product.
@@ -240,32 +215,19 @@ func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
 }
 
 func PutApiProductUpdate(apiProductId string, payload []byte) error {
-	cmd := newCurlCmd(
-		"-X", "PUT",
-		vars.BaseURL+"/api-products/"+apiProductId,
-		"-H", contentTypeJSON,
-		"-d", "@-",
-		"-k",
-		"-s", "-w", httpStatusFormat)
-
-	cmd.Stdin = strings.NewReader(string(payload))
-
-	output, err := cmd.CombinedOutput()
+	url := vars.BaseURL + "/api-products/" + apiProductId
+	statusCode, body, err := doRequest(http.MethodPut, url, payload)
 	if err != nil {
-		return fmt.Errorf("PUT /api-products/%s curl error: %v, output: %s", apiProductId, err, output)
+		return fmt.Errorf("PUT /api-products/%s error: %v", apiProductId, err)
 	}
 
-	statusCode, body, err := parseCurlStatus(output, fmt.Sprintf("PUT /api-products/%s", apiProductId))
-	if err != nil {
-		return err
-	}
-	if strings.HasPrefix(statusCode, "2") {
-		fmt.Printf("PUT /api-products/%s: OK (HTTP %s)\n", apiProductId, statusCode)
+	if statusCode >= 200 && statusCode < 300 {
+		fmt.Printf("PUT /api-products/%s: OK (HTTP %d)\n", apiProductId, statusCode)
 		return nil
 	}
 
-	fmt.Printf("PUT /api-products/%s: FAILED (HTTP %s) - %s\n", apiProductId, statusCode, body)
-	return fmt.Errorf("HTTP %s", statusCode)
+	fmt.Printf("PUT /api-products/%s: FAILED (HTTP %d) - %s\n", apiProductId, statusCode, body)
+	return fmt.Errorf("HTTP %d", statusCode)
 }
 
 func productReferencesApis(product map[string]any, idSet map[string]bool) bool {
