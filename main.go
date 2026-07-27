@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"wso2/pctl/libraries/client"
 	"wso2/pctl/libraries/policy"
@@ -12,6 +13,18 @@ import (
 )
 
 func main() {
+
+	f, err := os.Create("cpu.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	if err := pprof.StartCPUProfile(f); err != nil {
+		log.Fatal(err)
+	}
+	defer pprof.StopCPUProfile()
+
 	vars.Load()
 
 	dryRun, isRollback, target := parseArguments()
