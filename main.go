@@ -141,9 +141,9 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		return
 	}
 
-	policyFilter := promptPolicyChoice()
-
 	allPolicies := client.ExtractOperationPolicies()
+	policyFilter := promptPolicyChoice(allPolicies, apiIds)
+
 	productIds := client.FindApiProductIdsUsingApis(apiIds)
 
 	if dryRun {
@@ -196,7 +196,7 @@ func executeUpdatePolicies(target string, dryRun bool) {
 // promptPolicyChoice asks the user whether to update all policies or a specific one.
 // Returns "" for all policies, or the entered policy name for a specific one.
 // If stdin is closed/EOF (like in CI/non-interactive settings), it defaults to all policies.
-func promptPolicyChoice() string {
+func promptPolicyChoice(allPolicies []map[string]interface{}, apiIds []string) string {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("Would you like to update:")
@@ -212,17 +212,20 @@ func promptPolicyChoice() string {
 	choice = strings.TrimSpace(choice)
 
 	if choice == "2" {
-		fmt.Print("Enter the policy name: ")
-		name, err := reader.ReadString('\n')
-		if err != nil {
-			return ""
+		for {
+			fmt.Print("Enter the policy name: ")
+			name, err := reader.ReadString('\n')
+			if err != nil {
+				return ""
+			}
+			name = strings.TrimSpace(name)
+			if name == "" || !policy.PolicyExists(name, allPolicies, apiIds) {
+				fmt.Println("This policy does not exist, try again")
+				continue
+			}
+			log.Printf("Policy filter active: only updating policy %q", name)
+			return name
 		}
-		name = strings.TrimSpace(name)
-		if name == "" {
-			log.Fatal("policy name cannot be empty")
-		}
-		log.Printf("Policy filter active: only updating policy %q", name)
-		return name
 	}
 
 	return ""

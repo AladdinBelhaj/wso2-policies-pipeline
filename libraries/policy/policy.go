@@ -380,3 +380,77 @@ func listFlowPolicies(opPolicies map[string]interface{}, flow string, level stri
 	}
 	return items
 }
+
+// PolicyExists checks whether a policy with the given name exists in the shared policies list,
+// in API-level policy lists, or is attached to any of the specified APIs.
+func PolicyExists(name string, allPolicies []map[string]interface{}, apiIds []string) bool {
+	// Check in shared operation policies
+	for _, p := range allPolicies {
+		if pName, ok := p["name"].(string); ok && pName == name {
+			return true
+		}
+		if pName, ok := p["policyName"].(string); ok && pName == name {
+			return true
+		}
+	}
+
+	// Check in API-level policies and attached policies for target APIs
+	for _, apiId := range apiIds {
+		for _, p := range client.ExtractApiLevelPolicies(apiId) {
+			if pName, ok := p["name"].(string); ok && pName == name {
+				return true
+			}
+			if pName, ok := p["policyName"].(string); ok && pName == name {
+				return true
+			}
+		}
+
+		apiDetailJsonObject := client.GetApiDetailsJsonObject(apiId)
+		var apiDetail map[string]any
+		if err := json.Unmarshal(apiDetailJsonObject, &apiDetail); err == nil {
+			if hasPolicyInApiDetail(apiDetail, name) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func hasPolicyInApiDetail(apiDetail map[string]any, name string) bool {
+	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
+		for _, flow := range policyFlows {
+			if flowList, ok := apiPoliciesBlock[flow].([]interface{}); ok {
+				for _, polRaw := range flowList {
+					if pol, ok := polRaw.(map[string]interface{}); ok {
+						if pName, ok := pol["policyName"].(string); ok && pName == name {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if operations, ok := apiDetail["operations"].([]interface{}); ok {
+		for _, opRaw := range operations {
+			if op, ok := opRaw.(map[string]interface{}); ok {
+				if opPolicies, ok := op["operationPolicies"].(map[string]interface{}); ok {
+					for _, flow := range policyFlows {
+						if flowList, ok := opPolicies[flow].([]interface{}); ok {
+							for _, polRaw := range flowList {
+								if pol, ok := polRaw.(map[string]interface{}); ok {
+									if pName, ok := pol["policyName"].(string); ok && pName == name {
+										return true
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
