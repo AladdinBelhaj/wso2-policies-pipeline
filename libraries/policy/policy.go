@@ -43,6 +43,11 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 		modified = true
 	}
 
+	if !modified {
+		log.Printf("No changes detected for API %s. Skipping update and deployment.", apiId)
+		return
+	}
+
 	if modified {
 		updatedJson, err := json.Marshal(apiDetail)
 		if err != nil {
