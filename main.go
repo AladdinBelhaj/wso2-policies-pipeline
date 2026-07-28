@@ -167,7 +167,8 @@ func buildRollbackPreview(apiIds []string, productIds []string) string {
 
 func executeUpdatePolicies(target string, dryRun bool) {
 	apiIds := fetchApiIds(target, false)
-	productIds := client.FindApiProductIdsUsingApis(apiIds)
+	productRefs := client.FindApiProductsUsingApis(apiIds)
+	productIds := productIdsFromRefs(productRefs)
 
 	if len(apiIds) == 0 && target != "" {
 		productSummaries := client.ExtractApiProductSummaries()
@@ -224,14 +225,49 @@ func executeUpdatePolicies(target string, dryRun bool) {
 	}
 
 	apiDetails := client.ExtractApiPolicies(apiIds)
-	policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
+	modifiedApis := policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
 
 	if len(productIds) > 0 {
-		selectedProductIds := promptApiProductSelection(productIds)
-		if len(selectedProductIds) > 0 {
-			policy.RestoreApiProductPolicies(selectedProductIds, productSnapshots, allPolicies, policyFilter)
+		updatableProductIds := filterProductsWithChanges(productRefs, modifiedApis)
+		if len(updatableProductIds) > 0 {
+			selectedProductIds := promptApiProductSelection(updatableProductIds)
+			if len(selectedProductIds) > 0 {
+				policy.RestoreApiProductPolicies(selectedProductIds, productSnapshots, allPolicies, policyFilter)
+			}
 		}
 	}
+}
+
+// productIdsFromRefs extracts the plain list of API Product IDs from the
+// API-reference mapping returned by client.FindApiProductsUsingApis.
+func productIdsFromRefs(refs []client.ApiProductRef) []string {
+	ids := make([]string, 0, len(refs))
+	for _, r := range refs {
+		ids = append(ids, r.ProductID)
+	}
+	return ids
+}
+
+// filterProductsWithChanges drops any API Product whose referenced APIs
+// (within the current run) had no actual policy changes deployed, so the
+// user is never prompted to update a product that has nothing new to pull in.
+func filterProductsWithChanges(productRefs []client.ApiProductRef, modifiedApis map[string]bool) []string {
+	var updatable []string
+	for _, ref := range productRefs {
+		hasChange := false
+		for _, apiId := range ref.ApiIDs {
+			if modifiedApis[apiId] {
+				hasChange = true
+				break
+			}
+		}
+		if hasChange {
+			updatable = append(updatable, ref.ProductID)
+		} else {
+			log.Printf("Skipping API Product %s: no policy changes in referenced API(s)", client.GetApiProductName(ref.ProductID))
+		}
+	}
+	return updatable
 }
 
 // promptPolicyChoice asks the user whether to update all policies or a specific one.

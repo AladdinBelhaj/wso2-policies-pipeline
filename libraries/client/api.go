@@ -13,6 +13,62 @@ const (
 	PathOperationPolicies = "/operation-policies?limit=100"
 )
 
+type ApiProductRef struct {
+	ProductID string
+	ApiIDs    []string
+}
+
+// FindApiProductsUsingApis returns, for each API Product that references at
+// least one of apiIds, the subset of apiIds it actually references.
+func FindApiProductsUsingApis(apiIds []string) []ApiProductRef {
+	if len(apiIds) == 0 {
+		return nil
+	}
+
+	idSet := make(map[string]bool, len(apiIds))
+	for _, id := range apiIds {
+		idSet[id] = true
+	}
+
+	productSummaries := ExtractApiProductSummaries()
+	var refs []ApiProductRef
+
+	for idx, summary := range productSummaries {
+		log.Printf("[%d/%d] Scanning API Product %s to check API references...", idx+1, len(productSummaries), summary.Name)
+		var product map[string]any
+		data := GetApiProductDetailsJsonObject(summary.ID)
+		if err := json.Unmarshal(data, &product); err != nil {
+			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
+			continue
+		}
+
+		if matched := referencedApiIds(product, idSet); len(matched) > 0 {
+			refs = append(refs, ApiProductRef{ProductID: summary.ID, ApiIDs: matched})
+		}
+	}
+
+	return refs
+}
+
+func referencedApiIds(product map[string]any, idSet map[string]bool) []string {
+	apis, ok := product["apis"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var matched []string
+	for _, apiRaw := range apis {
+		api, ok := apiRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if apiId, ok := api["apiId"].(string); ok && idSet[apiId] {
+			matched = append(matched, apiId)
+		}
+	}
+	return matched
+}
+
 // This function executes an HTTP GET to fetch the JSON object from the /apis endpoint.
 func getApiJsonObject() []byte {
 	return getJSON(vars.BaseURL + "/apis")
