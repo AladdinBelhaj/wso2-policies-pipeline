@@ -288,12 +288,13 @@ func promptPolicyChoice(allPolicies []map[string]interface{}, apiIds []string) s
 				return ""
 			}
 			name = strings.TrimSpace(name)
-			if name == "" || !policy.PolicyExists(name, allPolicies, apiIds) {
+			resolvedName, found := policy.ResolvePolicyName(name, allPolicies, apiIds)
+			if name == "" || !found {
 				fmt.Println("This policy does not exist, try again")
 				continue
 			}
-			log.Printf("Policy filter active: only updating policy %q", name)
-			return name
+			log.Printf("Policy filter active: only updating policy %q (matched from input %q)", resolvedName, name)
+			return resolvedName
 		}
 	}
 

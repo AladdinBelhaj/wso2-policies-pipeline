@@ -86,9 +86,10 @@ func normalizePolicyList(data map[string]any) []map[string]interface{} {
 			continue
 		}
 		policies = append(policies, map[string]interface{}{
-			"id":      policy["id"],
-			"name":    policy["name"],
-			"version": policy["version"],
+			"id":          policy["id"],
+			"name":        policy["name"],
+			"displayName": policy["displayName"],
+			"version":     policy["version"],
 		})
 	}
 

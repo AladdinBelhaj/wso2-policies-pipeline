@@ -465,6 +465,43 @@ func PolicyExists(name string, allPolicies []map[string]interface{}, apiIds []st
 	return false
 }
 
+// ResolvePolicyName looks up a policy by the name shown in the WSO2 UI
+// (displayName) or by its internal name, and returns the internal name -
+// the value actually stored in operationPolicies[...].policyName - which is
+// what must be used as the filter for matching/updating. WSO2 sanitizes the
+// internal name on creation (stripping spaces/underscores/etc.), so the
+// display name is often the only identifier that matches what the user
+// actually typed when creating the policy.
+func ResolvePolicyName(input string, allPolicies []map[string]interface{}, apiIds []string) (string, bool) {
+	if input == "" {
+		return "", false
+	}
+
+	if resolved, ok := resolveInPolicyList(input, allPolicies); ok {
+		return resolved, true
+	}
+
+	for _, apiId := range apiIds {
+		if resolved, ok := resolveInPolicyList(input, client.ExtractApiLevelPolicies(apiId)); ok {
+			return resolved, true
+		}
+	}
+
+	return "", false
+}
+
+func resolveInPolicyList(input string, policies []map[string]interface{}) (string, bool) {
+	for _, p := range policies {
+		displayName, _ := p["displayName"].(string)
+		name, _ := p["name"].(string)
+
+		if name != "" && (strings.EqualFold(displayName, input) || strings.EqualFold(name, input)) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
 func hasPolicyInApiDetail(apiDetail map[string]any, name string) bool {
 	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
 		for _, flow := range policyFlows {
