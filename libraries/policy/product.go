@@ -272,123 +272,23 @@ func sanitizeSingleOperationFlows(opPolicies map[string]interface{}) {
 	}
 }
 
-// OperationPolicySnapshot captures the real (non-reflection) operation-level
-// policies attached to one operation at a point in time, so they can be
-// restored later after something (e.g. a source API revision redeploy)
-// wipes the product's operation policy state.
-type OperationPolicySnapshot struct {
-	Verb   string
-	Target string
-	Flows  map[string][]map[string]interface{} // flow -> real (non "api" type) policy entries
-}
-
-// SnapshotApiProductRealPolicies must be called BEFORE the source API is
-// updated/redeployed. It captures only genuine attachments (policyType !=
-// "api") per operation, keyed by the owning apiId, so they can be resolved
-// to newer versions and written back after the redeploy wipes them.
-func SnapshotApiProductRealPolicies(productDetail map[string]any) map[string][]OperationPolicySnapshot {
-	result := make(map[string][]OperationPolicySnapshot)
-
-	apis, ok := productDetail["apis"].([]interface{})
-	if !ok {
-		return result
-	}
-
-	for _, apiRaw := range apis {
-		api, ok := apiRaw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		apiId, _ := api["apiId"].(string)
-		if snaps := snapshotSingleApiOperations(api); snaps != nil {
-			result[apiId] = snaps
-		}
-	}
-
-	return result
-}
-
-func snapshotSingleApiOperations(api map[string]interface{}) []OperationPolicySnapshot {
-	operations, ok := api["operations"].([]interface{})
-	if !ok {
-		return nil
-	}
-
-	var snaps []OperationPolicySnapshot
-	for _, opRaw := range operations {
-		op, ok := opRaw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if snap, ok := snapshotSingleOperation(op); ok {
-			snaps = append(snaps, snap)
-		}
-	}
-	return snaps
-}
-
-func snapshotSingleOperation(op map[string]interface{}) (OperationPolicySnapshot, bool) {
-	target, _ := op["target"].(string)
-	verb, _ := op["verb"].(string)
-
-	opPolicies, ok := op["operationPolicies"].(map[string]interface{})
-	if !ok {
-		return OperationPolicySnapshot{}, false
-	}
-
-	snap := OperationPolicySnapshot{Verb: verb, Target: target, Flows: map[string][]map[string]interface{}{}}
-
-	for _, flow := range productPolicyFlows {
-		flowList, ok := opPolicies[flow].([]interface{})
-		if !ok {
-			continue
-		}
-		var real []map[string]interface{}
-		for _, polRaw := range flowList {
-			pol, ok := polRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if policyType, _ := pol["policyType"].(string); policyType == "api" {
-				continue
-			}
-			real = append(real, pol)
-		}
-		if len(real) > 0 {
-			snap.Flows[flow] = real
-		}
-	}
-
-	return snap, true
-}
-
-// RestoreApiProductPolicies resolves each pre-update snapshot's policies to
-// their newest versions, re-fetches the CURRENT (post-redeploy) product
-// state, merges the resolved real policies back into the matching
-// operations, and PUTs the result back so real attachments survive the
-// source API's redeploy instead of being silently dropped.
-func RestoreApiProductPolicies(productIds []string, preUpdateSnapshots map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
+// RestoreApiProductPolicies projects each source API's current (post-update)
+// operation-level policies onto the matching API Product operations, using
+// the API as ground truth rather than the product's own embedded copy. This
+// is deliberate: the product's own copy can be wiped either by a source API
+// redeploy or by rolling back the product itself to an older revision, so it
+// must never be trusted as the source of truth for what "real" policies
+// should exist.
+func RestoreApiProductPolicies(productIds []string, apiDetails map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
 	for idx, productId := range productIds {
 		productName := client.GetApiProductName(productId)
 		log.Printf("[%d/%d] Restoring policies for API Product %s...", idx+1, len(productIds), productName)
-		snapshotDetail, ok := preUpdateSnapshots[productId]
-		if !ok {
-			continue
-		}
-		restoreSingleApiProduct(productId, snapshotDetail, allPolicies, policyFilter...)
+		restoreSingleApiProduct(productId, apiDetails)
 	}
 }
 
-func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
-	realByApi := SnapshotApiProductRealPolicies(snapshotDetail)
+func restoreSingleApiProduct(productId string, apiDetails map[string]map[string]any) {
 	productName := client.GetApiProductName(productId)
-
-	if !hasAnyPolicies(realByApi) {
-		log.Printf("No real operation-level policies to restore for API Product %s", productName)
-		return
-	}
-
-	resolveSnapshots(realByApi, allPolicies, policyFilter...)
 
 	fresh := client.GetApiProductDetailsJsonObject(productId)
 	var freshDetail map[string]any
@@ -397,9 +297,11 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 		return
 	}
 
-	mergeRealOperationPolicies(freshDetail, realByApi)
+	if !projectApiOperationPolicies(freshDetail, apiDetails) {
+		log.Printf("No operation-level policy changes to project onto API Product %s", productName)
+		return
+	}
 
-	// Perform a single PUT update with restored operations and policies.
 	updatedJson, err := json.Marshal(freshDetail)
 	if err != nil {
 		log.Fatal(err)
@@ -412,102 +314,132 @@ func restoreSingleApiProduct(productId string, snapshotDetail map[string]any, al
 	client.PrepareAndDeployProductRevision(productId)
 }
 
-func hasAnyPolicies(realByApi map[string][]OperationPolicySnapshot) bool {
-	for _, snaps := range realByApi {
-		for _, s := range snaps {
-			if len(s.Flows) > 0 {
-				return true
-			}
-		}
-	}
-	return false
+type operationKey struct {
+	Verb   string
+	Target string
 }
 
-func resolveSnapshots(realByApi map[string][]OperationPolicySnapshot, allPolicies []map[string]interface{}, policyFilter ...string) {
-	for _, snaps := range realByApi {
-		for i := range snaps {
-			for flow, policies := range snaps[i].Flows {
-				wrapped := map[string]interface{}{flow: toPolicyInterfaceSlice(policies)}
-				resolveProductPoliciesInFlow(wrapped, flow, allPolicies, policyFilter...)
-				snaps[i].Flows[flow] = fromPolicyInterfaceSlice(wrapped[flow].([]interface{}))
-			}
-		}
-	}
-}
-
-// mergeRealOperationPolicies writes the resolved real policies back into the
-// matching operation (matched by apiId + target + verb) of a freshly
-// fetched product detail.
-func mergeRealOperationPolicies(productDetail map[string]any, realByApi map[string][]OperationPolicySnapshot) {
+// projectApiOperationPolicies overwrites each product operation's policy
+// flows with the current policies from the matching source API operation
+// (matched by apiId, then target+verb). Returns true if anything actually
+// changed relative to what the freshly-fetched product currently has.
+func projectApiOperationPolicies(productDetail map[string]any, apiDetails map[string]map[string]any) bool {
 	apis, ok := productDetail["apis"].([]interface{})
 	if !ok {
-		return
+		return false
 	}
 
+	modified := false
 	for _, apiRaw := range apis {
 		api, ok := apiRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
 		apiId, _ := api["apiId"].(string)
-		snaps, ok := realByApi[apiId]
+		sourceApiDetail, ok := apiDetails[apiId]
+		if !ok {
+			// This product operation belongs to an API not part of the
+			// current update run; leave it untouched.
+			continue
+		}
+		if projectSingleApiOperations(api, sourceApiDetail) {
+			modified = true
+		}
+	}
+	return modified
+}
+
+func projectSingleApiOperations(productApi map[string]interface{}, sourceApiDetail map[string]any) bool {
+	productOps, ok := productApi["operations"].([]interface{})
+	if !ok {
+		return false
+	}
+	sourceOps, ok := sourceApiDetail["operations"].([]interface{})
+	if !ok {
+		return false
+	}
+
+	sourceIndex := indexOperationsByVerbTarget(sourceOps)
+
+	modified := false
+	for _, opRaw := range productOps {
+		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		mergeSnapsIntoApiOperations(api, snaps)
+		target, _ := op["target"].(string)
+		verb, _ := op["verb"].(string)
+
+		sourceOp, found := sourceIndex[operationKey{Verb: verb, Target: target}]
+		if !found {
+			continue
+		}
+
+		if projectSingleOperationPolicies(op, sourceOp) {
+			modified = true
+		}
 	}
+	return modified
 }
 
-func mergeSnapsIntoApiOperations(api map[string]interface{}, snaps []OperationPolicySnapshot) {
-	operations, ok := api["operations"].([]interface{})
-	if !ok {
-		return
-	}
-
+func indexOperationsByVerbTarget(operations []interface{}) map[operationKey]map[string]interface{} {
+	index := make(map[operationKey]map[string]interface{}, len(operations))
 	for _, opRaw := range operations {
 		op, ok := opRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		mergeSnapsIntoOperation(op, snaps)
+		target, _ := op["target"].(string)
+		verb, _ := op["verb"].(string)
+		index[operationKey{Verb: verb, Target: target}] = op
 	}
+	return index
 }
 
-func mergeSnapsIntoOperation(op map[string]interface{}, snaps []OperationPolicySnapshot) {
-	target, _ := op["target"].(string)
-	verb, _ := op["verb"].(string)
+// projectSingleOperationPolicies replaces the product operation's policy
+// list, per flow, with the source API operation's current policy list.
+// This wholesale replacement is intentional: it both refreshes real
+// attachments and drops any stale "policyType":"api" reflection entries,
+// since the source API's operationPolicies never contain those reflections
+// in the first place.
+func projectSingleOperationPolicies(productOp map[string]interface{}, sourceOp map[string]interface{}) bool {
+	productOpPolicies, ok := productOp["operationPolicies"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	sourceOpPolicies, ok := sourceOp["operationPolicies"].(map[string]interface{})
+	if !ok {
+		return false
+	}
 
-	for _, snap := range snaps {
-		if snap.Target != target || snap.Verb != verb {
-			continue
-		}
-		opPolicies, ok := op["operationPolicies"].(map[string]interface{})
+	modified := false
+	for _, flow := range productPolicyFlows {
+		sourceList, ok := sourceOpPolicies[flow].([]interface{})
 		if !ok {
-			continue
+			sourceList = []interface{}{}
 		}
-		for flow, real := range snap.Flows {
-			existing, _ := opPolicies[flow].([]interface{})
-			opPolicies[flow] = append(existing, toPolicyInterfaceSlice(real)...)
+
+		if !policyListsEqual(productOpPolicies[flow], sourceList) {
+			modified = true
 		}
+		productOpPolicies[flow] = sourceList
 	}
+	return modified
 }
 
-func toPolicyInterfaceSlice(policies []map[string]interface{}) []interface{} {
-	out := make([]interface{}, len(policies))
-	for i, p := range policies {
-		out[i] = p
+// policyListsEqual compares two policy-entry lists by JSON content so
+// unrelated field ordering doesn't cause false positives.
+func policyListsEqual(a interface{}, b []interface{}) bool {
+	aList, _ := a.([]interface{})
+	if len(aList) != len(b) {
+		return false
 	}
-	return out
-}
-
-func fromPolicyInterfaceSlice(items []interface{}) []map[string]interface{} {
-	out := make([]map[string]interface{}, 0, len(items))
-	for _, item := range items {
-		if m, ok := item.(map[string]interface{}); ok {
-			out = append(out, m)
-		}
+	aJson, err1 := json.Marshal(aList)
+	bJson, err2 := json.Marshal(b)
+	if err1 != nil || err2 != nil {
+		return false
 	}
-	return out
+	return string(aJson) == string(bJson)
 }
 
 // stripApiProductOperations returns a copy of productDetail with "operations"
