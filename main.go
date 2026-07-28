@@ -15,14 +15,16 @@ import (
 )
 
 var (
-	dryRun bool
+	dryRun  bool
+	envFlag string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "pctl",
 	Short: "pctl is a CLI tool for WSO2 policy deployment and management",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		vars.Load()
+		vars.EnvOverride = envFlag
+		vars.LoadEnvironments()
 	},
 }
 
@@ -31,6 +33,9 @@ var updateCmd = &cobra.Command{
 	Short: "Update policies for all APIs or a specific API",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if err := vars.ResolveEnv(); err != nil {
+			log.Fatal(err)
+		}
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
@@ -44,6 +49,9 @@ var rollbackCmd = &cobra.Command{
 	Short: "Rollback API revisions to previous state",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if err := vars.ResolveEnv(); err != nil {
+			log.Fatal(err)
+		}
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
@@ -52,12 +60,27 @@ var rollbackCmd = &cobra.Command{
 	},
 }
 
+var setEnvCmd = &cobra.Command{
+	Use:   "set-env [ENV_NAME]",
+	Short: "Persist the environment pctl should use for subsequent commands",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := vars.SetEnv(args[0]); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Environment set to %q (saved to %s)\n", args[0], vars.ConfigPath)
+	},
+}
+
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "", "Environment to use for this command (overrides the persisted current_env, without saving it)")
+
 	updateCmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview changes without applying them")
 	rollbackCmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview rollback without applying")
 
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(rollbackCmd)
+	rootCmd.AddCommand(setEnvCmd)
 }
 
 func main() {
