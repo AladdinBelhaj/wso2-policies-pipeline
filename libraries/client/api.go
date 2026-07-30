@@ -136,6 +136,22 @@ func GetApiDetailsJsonObject(apiId string) []byte {
 	return getJSON(vars.BaseURL + PathAPI + apiId)
 }
 
+// GetApiDeployments fetches the deployments list for an API from GET /apis/{apiId}/deployments
+func GetApiDeployments(apiId string) []Deployment {
+	url := vars.BaseURL + PathAPI + apiId + "/deployments"
+	statusCode, body, err := doRequest(http.MethodGet, url, nil)
+	if err != nil || statusCode < 200 || statusCode >= 300 {
+		return defaultDeployments()
+	}
+
+	var list []map[string]any
+	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
+		return defaultDeployments()
+	}
+
+	return parseDeploymentsList(list)
+}
+
 // This function iterates through the list of API IDs and fetches the full details for each API.
 func ExtractApiPolicies(apiIds []string) map[string]map[string]any {
 	apiDetails := make(map[string]map[string]any, len(apiIds))
@@ -212,6 +228,67 @@ func getApiProductJsonObject() []byte {
 
 func GetApiProductDetailsJsonObject(apiProductId string) []byte {
 	return getJSON(vars.BaseURL + "/api-products/" + apiProductId)
+}
+
+// GetApiProductDeployments fetches the deployments list for an API product from GET /api-products/{apiProductId}/deployments
+func GetApiProductDeployments(apiProductId string) []Deployment {
+	url := vars.BaseURL + "/api-products/" + apiProductId + "/deployments"
+	statusCode, body, err := doRequest(http.MethodGet, url, nil)
+	if err != nil || statusCode < 200 || statusCode >= 300 {
+		return defaultDeployments()
+	}
+
+	var list []map[string]any
+	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
+		return defaultDeployments()
+	}
+
+	return parseDeploymentsList(list)
+}
+
+func defaultDeployments() []Deployment {
+	vhost := vars.Vhost
+	if vhost == "" {
+		vhost = "localhost"
+	}
+	return []Deployment{
+		{
+			Name:               "Default",
+			Vhost:              vhost,
+			DisplayOnDevportal: true,
+		},
+	}
+}
+
+func parseDeploymentsList(list []map[string]any) []Deployment {
+	deployments := make([]Deployment, 0, len(list))
+	for _, item := range list {
+		d := Deployment{
+			Name:               "Default",
+			DisplayOnDevportal: true,
+		}
+		if name, ok := item["name"].(string); ok && name != "" {
+			d.Name = name
+		}
+		if vhost, ok := item["vhost"].(string); ok && vhost != "" {
+			d.Vhost = vhost
+		}
+		if display, ok := item["displayOnDevportal"].(bool); ok {
+			d.DisplayOnDevportal = display
+		}
+		if d.Vhost == "" {
+			if vars.Vhost != "" {
+				d.Vhost = vars.Vhost
+			} else {
+				d.Vhost = "localhost"
+			}
+		}
+		deployments = append(deployments, d)
+	}
+	if len(deployments) == 0 {
+		return defaultDeployments()
+	}
+	return deployments
 }
 
 // This function iterates through the JSON object and fetches the ID and name of each API product.

@@ -139,7 +139,22 @@ func executeRevisionRequest(method, url string, payload []byte, actionDesc strin
 
 // This function undeploys a revision before deleting it
 func UndeployRevision(apiId string, revisionId string) error {
-	payload := []byte(`[{"name":"Default","displayOnDevportal":false}]`)
+	deployments := GetApiDeployments(apiId)
+	type undeployItem struct {
+		Name               string `json:"name"`
+		DisplayOnDevportal bool   `json:"displayOnDevportal"`
+	}
+	var undeployList []undeployItem
+	for _, d := range deployments {
+		undeployList = append(undeployList, undeployItem{
+			Name:               d.Name,
+			DisplayOnDevportal: false,
+		})
+	}
+	payload, err := json.Marshal(undeployList)
+	if err != nil {
+		payload = []byte(`[{"name":"Default","displayOnDevportal":false}]`)
+	}
 
 	url := vars.BaseURL + PathAPI + apiId + PathUndeployRevision + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("undeploy revision %s", revisionId)); err != nil {
@@ -188,13 +203,11 @@ func CreateRevision(apiId string) string {
 
 // This function deploys a revision.
 func DeployRevision(apiId string, revisionId string) error {
-	payload := []byte(fmt.Sprintf(`[
-    {
-        "name": "Default",
-        "vhost": "%s",
-        "displayOnDevportal": true
-    }
-]`, vars.Vhost))
+	deployments := GetApiDeployments(apiId)
+	payload, err := json.Marshal(deployments)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deploy payload for API %s: %w", apiId, err)
+	}
 
 	url := vars.BaseURL + PathAPI + apiId + PathDeployRevision + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("deploy revision %s", revisionId)); err != nil {
@@ -273,7 +286,22 @@ func GetProductRevisionIds(productId string) ([]string, error) {
 
 // UndeployProductRevision undeploys an API Product revision before deleting it
 func UndeployProductRevision(productId string, revisionId string) error {
-	payload := []byte(`[{"name":"Default","displayOnDevportal":false}]`)
+	deployments := GetApiProductDeployments(productId)
+	type undeployItem struct {
+		Name               string `json:"name"`
+		DisplayOnDevportal bool   `json:"displayOnDevportal"`
+	}
+	var undeployList []undeployItem
+	for _, d := range deployments {
+		undeployList = append(undeployList, undeployItem{
+			Name:               d.Name,
+			DisplayOnDevportal: false,
+		})
+	}
+	payload, err := json.Marshal(undeployList)
+	if err != nil {
+		payload = []byte(`[{"name":"Default","displayOnDevportal":false}]`)
+	}
 	url := vars.BaseURL + "/api-products/" + productId + "/undeploy-revision?revisionId=" + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("undeploy product revision %s", revisionId)); err != nil {
 		return err
@@ -321,13 +349,11 @@ func CreateProductRevision(productId string) string {
 
 // DeployProductRevision deploys an API Product revision.
 func DeployProductRevision(productId string, revisionId string) error {
-	payload := []byte(fmt.Sprintf(`[
-    {
-        "name": "Default",
-        "vhost": "%s",
-        "displayOnDevportal": true
-    }
-]`, vars.Vhost))
+	deployments := GetApiProductDeployments(productId)
+	payload, err := json.Marshal(deployments)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deploy payload for API Product %s: %w", productId, err)
+	}
 
 	url := vars.BaseURL + "/api-products/" + productId + "/deploy-revision?revisionId=" + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("deploy product revision %s", revisionId)); err != nil {

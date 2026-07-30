@@ -20,6 +20,12 @@ type ApiProductSummary struct {
 	Name string
 }
 
+type Deployment struct {
+	Name               string `json:"name"`
+	Vhost              string `json:"vhost"`
+	DisplayOnDevportal bool   `json:"displayOnDevportal"`
+}
+
 const contentTypeJSON = "application/json"
 
 // httpClient is shared across all requests to the WSO2 Publisher API.
