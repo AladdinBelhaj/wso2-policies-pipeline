@@ -204,6 +204,37 @@ func SetEnv(name string) error {
 	return nil
 }
 
+// AddEnv persists a new environment definition to the config file and
+// updates the in-memory Environments map. If an environment with the same
+// name already exists, it is overwritten.
+func AddEnv(name string, env Env) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("environment name cannot be empty")
+	}
+
+	if _, exists := Environments[name]; exists {
+		log.Printf("Environment %q already exists; overwriting its configuration", name)
+	}
+
+	v.Set(fmt.Sprintf("environments.%s", name), map[string]interface{}{
+		"vhost":    env.Vhost,
+		"username": env.Username,
+		"password": env.Password,
+		"base_url": env.BaseURL,
+	})
+
+	if err := v.WriteConfig(); err != nil {
+		return fmt.Errorf("failed to persist new environment %q to %s: %w", name, ConfigPath, err)
+	}
+
+	if Environments == nil {
+		Environments = make(map[string]Env)
+	}
+	Environments[name] = env
+
+	return nil
+}
+
 // ListEnvNames returns the sorted list of defined environment names.
 func ListEnvNames() []string {
 	names := make([]string, 0, len(Environments))
