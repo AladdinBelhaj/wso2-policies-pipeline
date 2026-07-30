@@ -14,7 +14,6 @@ import (
 
 // Env holds the connection settings for a single named environment.
 type Env struct {
-	Vhost    string `mapstructure:"vhost"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	BaseURL  string `mapstructure:"base_url"`
@@ -24,7 +23,6 @@ var (
 	BaseURL    string
 	Username   string
 	Password   string
-	Vhost      string
 	ConfigPath string
 	LogsDir    string
 	CurrentEnv string
@@ -77,7 +75,6 @@ func LoadEnvironments() {
 		defaultConfigContent := []byte(`current_env: dev
 environments:
   dev:
-    vhost: "localhost"
     username: "admin"
     password: "admin"
     base_url: "https://localhost:9443/api/am/publisher/v4"
@@ -123,7 +120,6 @@ func migrateFlatConfigIfNeeded(v *viper.Viper) {
 
 	v.Set("environments", map[string]interface{}{
 		"dev": map[string]interface{}{
-			"vhost":    v.GetString("vhost"),
 			"username": v.GetString("username"),
 			"password": v.GetString("password"),
 			"base_url": v.GetString("base_url"),
@@ -141,7 +137,7 @@ func migrateFlatConfigIfNeeded(v *viper.Viper) {
 // ResolveEnv determines which environment to use - EnvOverride, then the
 // persisted current_env, then (if there's exactly one environment defined)
 // that environment automatically - and populates BaseURL/Username/
-// Password/Vhost accordingly. It returns an error rather than fataling so
+// Password accordingly. It returns an error rather than fataling so
 // callers can decide how to present the failure.
 func ResolveEnv() error {
 	name, err := resolveEnvName()
@@ -151,7 +147,6 @@ func ResolveEnv() error {
 
 	env := Environments[name]
 	CurrentEnv = name
-	Vhost = env.Vhost
 	Username = env.Username
 	Password = env.Password
 	BaseURL = env.BaseURL
@@ -201,7 +196,6 @@ func SetEnv(name string) error {
 
 	CurrentEnv = name
 	env := Environments[name]
-	Vhost = env.Vhost
 	Username = env.Username
 	Password = env.Password
 	BaseURL = env.BaseURL
@@ -222,7 +216,6 @@ func AddEnv(name string, env Env) error {
 	}
 
 	v.Set(fmt.Sprintf("environments.%s", name), map[string]interface{}{
-		"vhost":    env.Vhost,
 		"username": env.Username,
 		"password": env.Password,
 		"base_url": env.BaseURL,

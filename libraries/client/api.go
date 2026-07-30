@@ -247,14 +247,10 @@ func GetApiProductDeployments(apiProductId string) []Deployment {
 }
 
 func defaultDeployments() []Deployment {
-	vhost := vars.Vhost
-	if vhost == "" {
-		vhost = "localhost"
-	}
 	return []Deployment{
 		{
 			Name:               "Default",
-			Vhost:              vhost,
+			Vhost:              "localhost",
 			DisplayOnDevportal: true,
 		},
 	}
@@ -277,11 +273,7 @@ func parseDeploymentsList(list []map[string]any) []Deployment {
 			d.DisplayOnDevportal = display
 		}
 		if d.Vhost == "" {
-			if vars.Vhost != "" {
-				d.Vhost = vars.Vhost
-			} else {
-				d.Vhost = "localhost"
-			}
+			d.Vhost = "localhost"
 		}
 		deployments = append(deployments, d)
 	}

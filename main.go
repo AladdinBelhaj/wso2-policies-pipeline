@@ -21,7 +21,6 @@ var (
 	addEnvBaseURL  string
 	addEnvUsername string
 	addEnvPassword string
-	addEnvVhost    string
 )
 
 var rootCmd = &cobra.Command{
@@ -103,7 +102,6 @@ func init() {
 	addEnvCmd.Flags().StringVar(&addEnvBaseURL, "burl", "", "Base URL for the new environment")
 	addEnvCmd.Flags().StringVar(&addEnvUsername, "username", "", "Username for the new environment")
 	addEnvCmd.Flags().StringVar(&addEnvPassword, "password", "", "Password for the new environment")
-	addEnvCmd.Flags().StringVar(&addEnvVhost, "vhost", "", "Vhost for the new environment")
 
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(rollbackCmd)
@@ -404,11 +402,11 @@ func promptApiProductSelectionOneByOne(reader *bufio.Reader, productIds []string
 
 // resolveNewEnvConfig determines the settings for a new environment being
 // added via `add-env`. If none of the config flags were passed, it prompts
-// interactively for each value. If some but not all four were passed, it
+// interactively for each value. If some but not all three were passed, it
 // errors out and asks the user to provide all of them together.
 func resolveNewEnvConfig(cmd *cobra.Command) (vars.Env, error) {
 	flagsSet := 0
-	for _, name := range []string{"burl", "username", "password", "vhost"} {
+	for _, name := range []string{"burl", "username", "password"} {
 		if cmd.Flags().Changed(name) {
 			flagsSet++
 		}
@@ -418,19 +416,18 @@ func resolveNewEnvConfig(cmd *cobra.Command) (vars.Env, error) {
 		return promptNewEnvConfig()
 	}
 
-	if flagsSet < 4 {
-		return vars.Env{}, fmt.Errorf("please provide all flags together (--burl, --username, --password, --vhost), or none of them to enter values interactively")
+	if flagsSet < 3 {
+		return vars.Env{}, fmt.Errorf("please provide all flags together (--burl, --username, --password), or none of them to enter values interactively")
 	}
 
 	return vars.Env{
 		BaseURL:  addEnvBaseURL,
 		Username: addEnvUsername,
 		Password: addEnvPassword,
-		Vhost:    addEnvVhost,
 	}, nil
 }
 
-// promptNewEnvConfig interactively collects the four environment values
+// promptNewEnvConfig interactively collects the environment values
 // from stdin, used when `add-env [ENV_NAME]` is run with no config flags.
 func promptNewEnvConfig() (vars.Env, error) {
 	reader := bufio.NewReader(os.Stdin)
@@ -449,11 +446,6 @@ func promptNewEnvConfig() (vars.Env, error) {
 
 	fmt.Print("Enter password: ")
 	if env.Password, err = readTrimmedLine(reader); err != nil {
-		return vars.Env{}, err
-	}
-
-	fmt.Print("Enter vhost: ")
-	if env.Vhost, err = readTrimmedLine(reader); err != nil {
 		return vars.Env{}, err
 	}
 
