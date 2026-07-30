@@ -26,6 +26,7 @@ var (
 	Password   string
 	Vhost      string
 	ConfigPath string
+	LogsDir    string
 	CurrentEnv string
 
 	Environments map[string]Env
@@ -59,11 +60,15 @@ func LoadEnvironments() {
 	}
 
 	ConfigPath = filepath.Join(configDir, "config.yaml")
+	LogsDir = filepath.Join(configDir, "logs")
 
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		log.Printf("Warning: could not create config directory %s: %v", configDir, err)
 	}
 
+	if err := os.MkdirAll(LogsDir, 0755); err != nil {
+		log.Printf("Warning: could not create logs directory %s: %v", LogsDir, err)
+	}
 	v = viper.New()
 	v.SetConfigFile(ConfigPath)
 	v.SetConfigType("yaml")
