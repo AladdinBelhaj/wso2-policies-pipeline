@@ -693,8 +693,8 @@ func promptApiProductUpdateMode(productIds []string) []string {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("Update API Products:")
-	fmt.Println("  1) ALL")
-	fmt.Println("  2) ONE by ONE")
+	fmt.Println("  1) All API Products")
+	fmt.Println("  2) Choose specific API Products")
 	fmt.Print("Enter choice [1/2]: ")
 
 	choice, err := reader.ReadString('\n')
