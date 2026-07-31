@@ -390,6 +390,6 @@ func PrepareAndDeployProductRevision(productId string) {
 
 	fmt.Printf("Created product revision %s; deploying it\n", newRevisionID)
 	if err := DeployProductRevision(productId, newRevisionID); err != nil {
-		log.Fatalf("failed to deploy product revision %s: %v", err)
+		log.Fatalf("failed to deploy product revision %s: %v", newRevisionID, err)
 	}
 }

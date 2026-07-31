@@ -206,7 +206,9 @@ func ExtractApiLevelPolicies(apiId string) []map[string]interface{} {
 }
 
 // This function sends the updated API JSON back to WSO2 via PUT /apis/{apiId}.
-func PutApiUpdate(apiId string, payload []byte) error {
+// policies lists the exact operation/API-level policies that were attempted
+// in this update, so a failure can be logged with full context.
+func PutApiUpdate(apiId string, payload []byte, policies []string) error {
 	url := vars.BaseURL + PathAPI + apiId
 	statusCode, body, err := doRequest(http.MethodPut, url, payload)
 	if err != nil {
@@ -219,6 +221,7 @@ func PutApiUpdate(apiId string, payload []byte) error {
 	}
 
 	fmt.Printf("PUT /apis/%s: FAILED (HTTP %d) - %s\n", apiId, statusCode, body)
+	LogUpdateFailure("API", GetApiName(apiId), statusCode, body, policies)
 	return fmt.Errorf("HTTP %d", statusCode)
 }
 
@@ -339,7 +342,9 @@ func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
 	return details
 }
 
-func PutApiProductUpdate(apiProductId string, payload []byte) error {
+// policies lists the exact operation-level policies that were attempted in
+// this update, so a failure can be logged with full context.
+func PutApiProductUpdate(apiProductId string, payload []byte, policies []string) error {
 	url := vars.BaseURL + "/api-products/" + apiProductId
 	statusCode, body, err := doRequest(http.MethodPut, url, payload)
 	if err != nil {
@@ -352,6 +357,7 @@ func PutApiProductUpdate(apiProductId string, payload []byte) error {
 	}
 
 	fmt.Printf("PUT /api-products/%s: FAILED (HTTP %d) - %s\n", apiProductId, statusCode, body)
+	LogUpdateFailure("API Product", GetApiProductName(apiProductId), statusCode, body, policies)
 	return fmt.Errorf("HTTP %d", statusCode)
 }
 

@@ -27,7 +27,8 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 
 	fmt.Printf("Updating API Product: %s\n", productName)
 
-	modified := updateApiProductOperations(productDetail, allPolicies, policyFilter...)
+	var changedPolicies []string
+	modified := updateApiProductOperations(productDetail, allPolicies, &changedPolicies, policyFilter...)
 	sanitizeApiProductOperations(productDetail)
 
 	if modified {
@@ -36,7 +37,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 		if err != nil {
 			log.Fatalf("failed to marshal API Product JSON: %v", err)
 		}
-		if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
+		if err := client.PutApiProductUpdate(productId, updatedJson, changedPolicies); err != nil {
 			log.Printf("failed to update API Product %s: %v", productName, err)
 			return
 		}
@@ -47,7 +48,7 @@ func processSingleApiProduct(productId string, productDetail map[string]any, all
 
 // updateApiProductOperations walks apis[].operations[].operationPolicies and
 // resolves real (non-reflected) operation-level policy versions in place.
-func updateApiProductOperations(productDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
+func updateApiProductOperations(productDetail map[string]any, policies []map[string]interface{}, changedPolicies *[]string, policyFilter ...string) bool {
 	apis, ok := productDetail["apis"].([]interface{})
 	if !ok {
 		return false
@@ -59,14 +60,14 @@ func updateApiProductOperations(productDetail map[string]any, policies []map[str
 		if !ok {
 			continue
 		}
-		if updateSingleApiOperations(api, policies, policyFilter...) {
+		if updateSingleApiOperations(api, policies, changedPolicies, policyFilter...) {
 			modified = true
 		}
 	}
 	return modified
 }
 
-func updateSingleApiOperations(api map[string]interface{}, policies []map[string]interface{}, policyFilter ...string) bool {
+func updateSingleApiOperations(api map[string]interface{}, policies []map[string]interface{}, changedPolicies *[]string, policyFilter ...string) bool {
 	operations, ok := api["operations"].([]interface{})
 	if !ok {
 		return false
@@ -82,7 +83,7 @@ func updateSingleApiOperations(api map[string]interface{}, policies []map[string
 			continue
 		}
 		for _, flow := range productPolicyFlows {
-			if resolveProductPoliciesInFlow(opPolicies, flow, policies, policyFilter...) {
+			if resolveProductPoliciesInFlow(opPolicies, flow, policies, changedPolicies, policyFilter...) {
 				modified = true
 			}
 		}
@@ -101,6 +102,7 @@ func resolveProductPoliciesInFlow(
 	opPolicies map[string]interface{},
 	flow string,
 	allPolicies []map[string]interface{},
+	changedPolicies *[]string,
 	policyFilter ...string,
 ) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
@@ -115,7 +117,7 @@ func resolveProductPoliciesInFlow(
 		if !ok {
 			continue
 		}
-		if resolveSingleProductPolicy(pol, flow, allPolicies, policyFilter...) {
+		if resolveSingleProductPolicy(pol, flow, allPolicies, changedPolicies, policyFilter...) {
 			changed = true
 		}
 	}
@@ -123,7 +125,7 @@ func resolveProductPoliciesInFlow(
 	return changed
 }
 
-func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPolicies []map[string]interface{}, policyFilter ...string) bool {
+func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPolicies []map[string]interface{}, changedPolicies *[]string, policyFilter ...string) bool {
 	if policyType, _ := pol["policyType"].(string); policyType == "api" {
 		return false
 	}
@@ -162,6 +164,9 @@ func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPoli
 		)
 		pol["policyId"] = policyId
 		pol["policyVersion"] = policyVersion
+		if changedPolicies != nil {
+			*changedPolicies = append(*changedPolicies, policyName)
+		}
 		return true
 	}
 
@@ -297,7 +302,8 @@ func restoreSingleApiProduct(productId string, apiDetails map[string]map[string]
 		return
 	}
 
-	if !projectApiOperationPolicies(freshDetail, apiDetails) {
+	var changedPolicies []string
+	if !projectApiOperationPolicies(freshDetail, apiDetails, &changedPolicies) {
 		log.Printf("No operation-level policy changes to project onto API Product %s", productName)
 		return
 	}
@@ -306,7 +312,7 @@ func restoreSingleApiProduct(productId string, apiDetails map[string]map[string]
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := client.PutApiProductUpdate(productId, updatedJson); err != nil {
+	if err := client.PutApiProductUpdate(productId, updatedJson, changedPolicies); err != nil {
 		log.Printf("failed to restore policies for API Product %s: %v", productName, err)
 		return
 	}
@@ -323,7 +329,7 @@ type operationKey struct {
 // flows with the current policies from the matching source API operation
 // (matched by apiId, then target+verb). Returns true if anything actually
 // changed relative to what the freshly-fetched product currently has.
-func projectApiOperationPolicies(productDetail map[string]any, apiDetails map[string]map[string]any) bool {
+func projectApiOperationPolicies(productDetail map[string]any, apiDetails map[string]map[string]any, changedPolicies *[]string) bool {
 	apis, ok := productDetail["apis"].([]interface{})
 	if !ok {
 		return false
@@ -342,14 +348,14 @@ func projectApiOperationPolicies(productDetail map[string]any, apiDetails map[st
 			// current update run; leave it untouched.
 			continue
 		}
-		if projectSingleApiOperations(api, sourceApiDetail) {
+		if projectSingleApiOperations(api, sourceApiDetail, changedPolicies) {
 			modified = true
 		}
 	}
 	return modified
 }
 
-func projectSingleApiOperations(productApi map[string]interface{}, sourceApiDetail map[string]any) bool {
+func projectSingleApiOperations(productApi map[string]interface{}, sourceApiDetail map[string]any, changedPolicies *[]string) bool {
 	productOps, ok := productApi["operations"].([]interface{})
 	if !ok {
 		return false
@@ -375,7 +381,7 @@ func projectSingleApiOperations(productApi map[string]interface{}, sourceApiDeta
 			continue
 		}
 
-		if projectSingleOperationPolicies(op, sourceOp) {
+		if projectSingleOperationPolicies(op, sourceOp, changedPolicies) {
 			modified = true
 		}
 	}
@@ -402,7 +408,7 @@ func indexOperationsByVerbTarget(operations []interface{}) map[operationKey]map[
 // attachments and drops any stale "policyType":"api" reflection entries,
 // since the source API's operationPolicies never contain those reflections
 // in the first place.
-func projectSingleOperationPolicies(productOp map[string]interface{}, sourceOp map[string]interface{}) bool {
+func projectSingleOperationPolicies(productOp map[string]interface{}, sourceOp map[string]interface{}, changedPolicies *[]string) bool {
 	productOpPolicies, ok := productOp["operationPolicies"].(map[string]interface{})
 	if !ok {
 		return false
@@ -421,10 +427,30 @@ func projectSingleOperationPolicies(productOp map[string]interface{}, sourceOp m
 
 		if !policyListsEqual(productOpPolicies[flow], sourceList) {
 			modified = true
+			if changedPolicies != nil {
+				*changedPolicies = append(*changedPolicies, policyNamesFromList(sourceList)...)
+			}
 		}
 		productOpPolicies[flow] = sourceList
 	}
 	return modified
+}
+
+// policyNamesFromList extracts the policyName of each policy entry in a
+// flow's policy list, for use when logging exactly which policies were
+// attempted in a projected (restore) update.
+func policyNamesFromList(list []interface{}) []string {
+	names := make([]string, 0, len(list))
+	for _, raw := range list {
+		pol, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if name, ok := pol["policyName"].(string); ok && name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // policyListsEqual compares two policy-entry lists by JSON content so

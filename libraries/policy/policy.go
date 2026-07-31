@@ -86,8 +86,9 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 		client.ExtractApiLevelPolicies(apiId)...,
 	)
 
-	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...)
-	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...) {
+	var changedPolicies []string
+	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies, &changedPolicies, policyFilter...)
+	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies, &changedPolicies, policyFilter...) {
 		modified = true
 	}
 
@@ -100,7 +101,7 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 	if err != nil {
 		log.Fatalf("failed to marshal API JSON: %v", err)
 	}
-	if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
+	if err := client.PutApiUpdate(apiId, updatedJson, changedPolicies); err != nil {
 		log.Printf("failed to update API %s: %v", apiName, err)
 		return false
 	}
@@ -108,7 +109,7 @@ func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[
 	client.PrepareAndDeployRevision(apiId)
 	return true
 }
-func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
+func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, changedPolicies *[]string, policyFilter ...string) bool {
 	apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{})
 	if !ok {
 		return false
@@ -116,14 +117,14 @@ func updateApiLevelPoliciesBlock(apiDetail map[string]any, policies []map[string
 
 	modified := false
 	for _, flow := range policyFlows {
-		if resolvePoliciesInFlow(apiPoliciesBlock, flow, LevelAPI, policies, policyFilter...) {
+		if resolvePoliciesInFlow(apiPoliciesBlock, flow, LevelAPI, policies, changedPolicies, policyFilter...) {
 			modified = true
 		}
 	}
 	return modified
 }
 
-func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, policyFilter ...string) bool {
+func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[string]interface{}, changedPolicies *[]string, policyFilter ...string) bool {
 	operations, ok := apiDetail["operations"].([]interface{})
 	if !ok {
 		return false
@@ -140,7 +141,7 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 			continue
 		}
 		for _, flow := range policyFlows {
-			if resolvePoliciesInFlow(opPolicies, flow, LevelOperation, policies, policyFilter...) {
+			if resolvePoliciesInFlow(opPolicies, flow, LevelOperation, policies, changedPolicies, policyFilter...) {
 				modified = true
 			}
 		}
@@ -157,6 +158,7 @@ func resolvePoliciesInFlow(
 	flow string,
 	level string,
 	allPolicies []map[string]interface{},
+	changedPolicies *[]string,
 	policyFilter ...string,
 ) bool {
 	flowList, ok := opPolicies[flow].([]interface{})
@@ -211,6 +213,9 @@ func resolvePoliciesInFlow(
 
 				pol["policyId"] = policyId
 				pol["policyVersion"] = policyVersion
+				if changedPolicies != nil {
+					*changedPolicies = append(*changedPolicies, policyName)
+				}
 				changed = true
 			}
 		}
