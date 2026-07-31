@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"wso2/pctl/libraries/client"
 	"wso2/pctl/libraries/policy"
+	"wso2/pctl/libraries/report"
 	"wso2/pctl/vars"
 
 	"github.com/spf13/cobra"
@@ -117,6 +119,17 @@ func main() {
 }
 
 func executeRollback(target string, dryRun bool) {
+	reportData := report.RollbackReportData{
+		Timestamp:    time.Now(),
+		Environment:  vars.CurrentEnv,
+		BaseURL:      vars.BaseURL,
+		TargetFilter: target,
+		IsDryRun:     dryRun,
+	}
+	if target == "" {
+		reportData.TargetFilter = "All APIs"
+	}
+
 	apiIds := fetchApiIds(target, true)
 	productIds := client.FindApiProductIdsUsingApis(apiIds)
 
@@ -127,12 +140,63 @@ func executeRollback(target string, dryRun bool) {
 			productIds = targetProductIds
 		} else {
 			log.Printf("API or API Product %q does not exist", target)
+			reportData.Status = "FAILED"
+			reportData.Summary = fmt.Sprintf("API or API Product %q does not exist", target)
+			report.GenerateRollbackReport(reportData)
 			return
 		}
 	}
 
 	if len(apiIds) == 0 && len(productIds) == 0 {
+		reportData.Status = "NO_TARGETS"
+		reportData.Summary = "No matching APIs or API Products found"
+		report.GenerateRollbackReport(reportData)
 		return
+	}
+
+	for _, apiId := range apiIds {
+		apiName := client.GetApiName(apiId)
+		revs, _ := client.GetRevisionIds(apiId)
+		currentPolicies := policy.ListCurrentPolicies(apiId)
+		deployments := client.GetApiDeployments(apiId)
+
+		detail := report.ApiRollbackDetail{
+			ID:              apiId,
+			Name:            apiName,
+			TotalRevisions:  len(revs),
+			InitialPolicies: currentPolicies,
+			Deployments:     deployments,
+		}
+
+		if len(revs) <= 1 {
+			detail.Status = "CANNOT_ROLLBACK"
+			detail.Error = fmt.Sprintf("Only %d revision(s) available", len(revs))
+		} else {
+			detail.RolledBackFrom = revs[len(revs)-1]
+			detail.RolledBackTo = revs[len(revs)-2]
+		}
+		reportData.APIs = append(reportData.APIs, detail)
+	}
+
+	for _, pid := range productIds {
+		pName := client.GetApiProductName(pid)
+		revs, _ := client.GetProductRevisionIds(pid)
+		deployments := client.GetApiProductDeployments(pid)
+
+		pDetail := report.ProductRollbackDetail{
+			ID:             pid,
+			Name:           pName,
+			TotalRevisions: len(revs),
+			Deployments:    deployments,
+		}
+		if len(revs) <= 1 {
+			pDetail.Status = "CANNOT_ROLLBACK"
+			pDetail.Error = fmt.Sprintf("Only %d revision(s) available", len(revs))
+		} else {
+			pDetail.RolledBackFrom = revs[len(revs)-1]
+			pDetail.RolledBackTo = revs[len(revs)-2]
+		}
+		reportData.Products = append(reportData.Products, pDetail)
 	}
 
 	preview := buildRollbackPreview(apiIds, productIds)
@@ -140,29 +204,53 @@ func executeRollback(target string, dryRun bool) {
 	if dryRun || !client.ConfirmAction(preview) {
 		if dryRun {
 			log.Println("dry run: no changes were applied")
+			reportData.Status = "DRY_RUN"
+			reportData.Summary = "Dry run rollback preview generated"
 		} else {
 			log.Println("operation cancelled")
+			reportData.Status = "CANCELLED"
+			reportData.Summary = "Rollback operation cancelled by user"
 		}
+		report.GenerateRollbackReport(reportData)
 		return
 	}
 
-	for idx, apiId := range apiIds {
-		apiName := client.GetApiName(apiId)
-		log.Printf("[%d/%d] Rolling back API %s...", idx+1, len(apiIds), apiName)
-		if err := client.RollbackApiRevision(apiId); err != nil {
-			log.Printf("rollback failed for API %s: %v", apiName, err)
+	for i, api := range reportData.APIs {
+		if api.Status == "CANNOT_ROLLBACK" {
+			continue
+		}
+		log.Printf("[%d/%d] Rolling back API %s...", i+1, len(reportData.APIs), api.Name)
+		if err := client.RollbackApiRevision(api.ID); err != nil {
+			log.Printf("rollback failed for API %s: %v", api.Name, err)
+			reportData.APIs[i].Status = "FAILED"
+			reportData.APIs[i].Error = err.Error()
+		} else {
+			reportData.APIs[i].Success = true
+			reportData.APIs[i].Status = "ROLLED_BACK"
+			reportData.APIs[i].PostRollbackPolicies = policy.ListCurrentPolicies(api.ID)
 		}
 	}
 
-	if len(productIds) > 0 {
-		for idx, productId := range productIds {
-			productName := client.GetApiProductName(productId)
-			log.Printf("[%d/%d] Rolling back API Product %s...", idx+1, len(productIds), productName)
-			if err := client.RollbackProductRevision(productId); err != nil {
-				log.Printf("rollback failed for API Product %s: %v", productName, err)
+	if len(reportData.Products) > 0 {
+		for i, prod := range reportData.Products {
+			if prod.Status == "CANNOT_ROLLBACK" {
+				continue
+			}
+			log.Printf("[%d/%d] Rolling back API Product %s...", i+1, len(reportData.Products), prod.Name)
+			if err := client.RollbackProductRevision(prod.ID); err != nil {
+				log.Printf("rollback failed for API Product %s: %v", prod.Name, err)
+				reportData.Products[i].Status = "FAILED"
+				reportData.Products[i].Error = err.Error()
+			} else {
+				reportData.Products[i].Success = true
+				reportData.Products[i].Status = "ROLLED_BACK"
 			}
 		}
 	}
+
+	reportData.Status = "SUCCESS"
+	reportData.Summary = "Rollback operation completed"
+	report.GenerateRollbackReport(reportData)
 }
 
 func buildRollbackPreview(apiIds []string, productIds []string) string {
@@ -215,6 +303,17 @@ func buildRollbackPreview(apiIds []string, productIds []string) string {
 }
 
 func executeUpdatePolicies(target string, dryRun bool) {
+	reportData := report.UpdateReportData{
+		Timestamp:    time.Now(),
+		Environment:  vars.CurrentEnv,
+		BaseURL:      vars.BaseURL,
+		TargetFilter: target,
+		IsDryRun:     dryRun,
+	}
+	if target == "" {
+		reportData.TargetFilter = "All APIs"
+	}
+
 	apiIds := fetchApiIds(target, false)
 	productRefs := client.FindApiProductsUsingApis(apiIds)
 	productIds := productIdsFromRefs(productRefs)
@@ -226,16 +325,66 @@ func executeUpdatePolicies(target string, dryRun bool) {
 			productIds = targetProductIds
 		} else {
 			log.Printf("API or API Product %q does not exist", target)
+			reportData.Status = "FAILED"
+			reportData.Summary = fmt.Sprintf("API or API Product %q does not exist", target)
+			report.GenerateUpdateReport(reportData)
 			return
 		}
 	}
 
 	if len(apiIds) == 0 && len(productIds) == 0 {
+		reportData.Status = "NO_TARGETS"
+		reportData.Summary = "No matching APIs or API Products found"
+		report.GenerateUpdateReport(reportData)
 		return
 	}
 
 	allPolicies := client.ExtractOperationPolicies()
 	policyFilter := promptPolicyChoice(allPolicies, apiIds)
+	reportData.PolicyFilter = policyFilter
+	if policyFilter == "" {
+		reportData.PolicyFilter = "All Policies"
+	}
+
+	for _, apiId := range apiIds {
+		apiName := client.GetApiName(apiId)
+		revs, _ := client.GetRevisionIds(apiId)
+		deployments := client.GetApiDeployments(apiId)
+		currentPolicies := policy.ListCurrentPolicies(apiId)
+		plannedChanges := policy.PreviewApiPolicyUpdates(apiId, allPolicies, policyFilter)
+
+		lastRev := ""
+		if len(revs) > 0 {
+			lastRev = revs[len(revs)-1]
+		}
+
+		apiDetail := report.ApiUpdateDetail{
+			ID:               apiId,
+			Name:             apiName,
+			PreviousRevision: lastRev,
+			Deployments:      deployments,
+			PlannedChanges:   plannedChanges,
+			CurrentPolicies:  currentPolicies,
+		}
+		reportData.APIs = append(reportData.APIs, apiDetail)
+	}
+
+	for _, pid := range productIds {
+		pName := client.GetApiProductName(pid)
+		revs, _ := client.GetProductRevisionIds(pid)
+		deployments := client.GetApiProductDeployments(pid)
+		lastRev := ""
+		if len(revs) > 0 {
+			lastRev = revs[len(revs)-1]
+		}
+		pDetail := report.ProductUpdateDetail{
+			ID:               pid,
+			Name:             pName,
+			PreviousRevision: lastRev,
+			Deployments:      deployments,
+		}
+		reportData.Products = append(reportData.Products, pDetail)
+	}
 
 	if dryRun {
 		preview := "Dry run: the following policy updates will be applied:\n"
@@ -261,12 +410,33 @@ func executeUpdatePolicies(target string, dryRun bool) {
 		}
 		if !client.ConfirmAction(preview) {
 			log.Println("operation cancelled")
+			reportData.Status = "CANCELLED"
+			reportData.Summary = "Dry run preview cancelled by user"
+			report.GenerateUpdateReport(reportData)
 			return
 		}
+		reportData.Status = "DRY_RUN_CONFIRMED"
+		reportData.Summary = "Dry run preview confirmed"
+		report.GenerateUpdateReport(reportData)
+		return
 	}
 
 	apiDetails := client.ExtractApiPolicies(apiIds)
 	modifiedApis := policy.UpdateApiPolicies(apiDetails, allPolicies, policyFilter)
+
+	for i, api := range reportData.APIs {
+		if modifiedApis[api.ID] {
+			reportData.APIs[i].Modified = true
+			reportData.APIs[i].Status = "MODIFIED_AND_DEPLOYED"
+			newRevs, _ := client.GetRevisionIds(api.ID)
+			if len(newRevs) > 0 {
+				reportData.APIs[i].NewRevision = newRevs[len(newRevs)-1]
+			}
+			reportData.APIs[i].CurrentPolicies = policy.ListCurrentPolicies(api.ID)
+		} else {
+			reportData.APIs[i].Status = "NO_CHANGES"
+		}
+	}
 
 	if len(productIds) > 0 {
 		updatableProductIds := filterProductsWithChanges(productRefs, modifiedApis)
@@ -274,9 +444,25 @@ func executeUpdatePolicies(target string, dryRun bool) {
 			selectedProductIds := promptApiProductUpdateMode(updatableProductIds)
 			if len(selectedProductIds) > 0 {
 				policy.RestoreApiProductPolicies(selectedProductIds, apiDetails, allPolicies, policyFilter)
+				for i, prod := range reportData.Products {
+					for _, selId := range selectedProductIds {
+						if prod.ID == selId {
+							reportData.Products[i].Updated = true
+							reportData.Products[i].Status = "UPDATED_AND_DEPLOYED"
+							newRevs, _ := client.GetProductRevisionIds(prod.ID)
+							if len(newRevs) > 0 {
+								reportData.Products[i].NewRevision = newRevs[len(newRevs)-1]
+							}
+						}
+					}
+				}
 			}
 		}
 	}
+
+	reportData.Status = "SUCCESS"
+	reportData.Summary = "Policy updates successfully processed"
+	report.GenerateUpdateReport(reportData)
 }
 
 // productIdsFromRefs extracts the plain list of API Product IDs from the
