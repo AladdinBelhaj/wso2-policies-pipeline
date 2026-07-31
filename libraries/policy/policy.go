@@ -149,6 +149,14 @@ func updateOperationsPoliciesBlock(apiDetail map[string]any, policies []map[stri
 	return modified
 }
 
+// CleanPolicyName removes '_imported' suffix (and any appended numbers/suffixes like '_imported_1') from a policy name.
+func CleanPolicyName(name string) string {
+	if idx := strings.Index(name, "_imported"); idx != -1 {
+		return name[:idx]
+	}
+	return name
+}
+
 // This function matches each policy in a single flow (request for example)
 // by name against the shared policies list and injects the resolved policyId
 // and policyVersion.
@@ -184,7 +192,9 @@ func resolvePoliciesInFlow(
 			continue
 		}
 
-		if filter != "" && policyName != filter {
+		cleanName := CleanPolicyName(policyName)
+
+		if filter != "" && CleanPolicyName(filter) != cleanName {
 			continue
 		}
 
@@ -201,7 +211,7 @@ func resolvePoliciesInFlow(
 				continue
 			}
 
-			if currentVersionNumber < policyVersionNumber {
+			if currentVersionNumber < policyVersionNumber || strings.Contains(policyName, "_imported") {
 				log.Printf(
 					"Updating %s policy [%s flow] %s: %s -> %s",
 					level,
@@ -211,10 +221,11 @@ func resolvePoliciesInFlow(
 					policyVersion,
 				)
 
+				pol["policyName"] = cleanName
 				pol["policyId"] = policyId
 				pol["policyVersion"] = policyVersion
 				if changedPolicies != nil {
-					*changedPolicies = append(*changedPolicies, policyName)
+					*changedPolicies = append(*changedPolicies, cleanName)
 				}
 				changed = true
 			}
@@ -231,8 +242,14 @@ func findNewestPolicyByName(name string, allPolicies []map[string]interface{}) (
 	latestVersion := ""
 	latestNumber := -1
 
+	cleanTarget := CleanPolicyName(name)
+
 	for _, policy := range allPolicies {
-		if policy["name"] != name {
+		pName, _ := policy["name"].(string)
+		if pName == "" {
+			pName, _ = policy["displayName"].(string)
+		}
+		if CleanPolicyName(pName) != cleanTarget {
 			continue
 		}
 
@@ -343,7 +360,9 @@ func collectPolicyChanges(
 			continue
 		}
 
-		if filter != "" && policyName != filter {
+		cleanName := CleanPolicyName(policyName)
+
+		if filter != "" && CleanPolicyName(filter) != cleanName {
 			continue
 		}
 
@@ -356,10 +375,10 @@ func collectPolicyChanges(
 				continue
 			}
 
-			if currentVersionNumber < policyVersionNumber {
+			if currentVersionNumber < policyVersionNumber || strings.Contains(policyName, "_imported") {
 				changes = append(changes, fmt.Sprintf(
 					"  Updating %s policy [%s flow] %s: %s -> %s",
-					level, flow, policyName, currentVersion, policyVersion,
+					level, flow, cleanName, currentVersion, policyVersion,
 				))
 			}
 		}
@@ -437,12 +456,13 @@ func listFlowPolicies(opPolicies map[string]interface{}, flow string, level stri
 // PolicyExists checks whether a policy with the given name exists in the shared policies list,
 // in API-level policy lists, or is attached to any of the specified APIs.
 func PolicyExists(name string, allPolicies []map[string]interface{}, apiIds []string) bool {
+	cleanTarget := CleanPolicyName(name)
 	// Check in shared operation policies
 	for _, p := range allPolicies {
-		if pName, ok := p["name"].(string); ok && pName == name {
+		if pName, ok := p["name"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 			return true
 		}
-		if pName, ok := p["policyName"].(string); ok && pName == name {
+		if pName, ok := p["policyName"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 			return true
 		}
 	}
@@ -450,10 +470,10 @@ func PolicyExists(name string, allPolicies []map[string]interface{}, apiIds []st
 	// Check in API-level policies and attached policies for target APIs
 	for _, apiId := range apiIds {
 		for _, p := range client.ExtractApiLevelPolicies(apiId) {
-			if pName, ok := p["name"].(string); ok && pName == name {
+			if pName, ok := p["name"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 				return true
 			}
-			if pName, ok := p["policyName"].(string); ok && pName == name {
+			if pName, ok := p["policyName"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 				return true
 			}
 		}
@@ -461,7 +481,7 @@ func PolicyExists(name string, allPolicies []map[string]interface{}, apiIds []st
 		apiDetailJsonObject := client.GetApiDetailsJsonObject(apiId)
 		var apiDetail map[string]any
 		if err := json.Unmarshal(apiDetailJsonObject, &apiDetail); err == nil {
-			if hasPolicyInApiDetail(apiDetail, name) {
+			if hasPolicyInApiDetail(apiDetail, cleanTarget) {
 				return true
 			}
 		}
@@ -496,24 +516,26 @@ func ResolvePolicyName(input string, allPolicies []map[string]interface{}, apiId
 }
 
 func resolveInPolicyList(input string, policies []map[string]interface{}) (string, bool) {
+	cleanInput := CleanPolicyName(input)
 	for _, p := range policies {
 		displayName, _ := p["displayName"].(string)
 		name, _ := p["name"].(string)
 
-		if name != "" && (strings.EqualFold(displayName, input) || strings.EqualFold(name, input)) {
-			return name, true
+		if name != "" && (strings.EqualFold(CleanPolicyName(displayName), cleanInput) || strings.EqualFold(CleanPolicyName(name), cleanInput)) {
+			return CleanPolicyName(name), true
 		}
 	}
 	return "", false
 }
 
 func hasPolicyInApiDetail(apiDetail map[string]any, name string) bool {
+	cleanTarget := CleanPolicyName(name)
 	if apiPoliciesBlock, ok := apiDetail["apiPolicies"].(map[string]interface{}); ok {
 		for _, flow := range policyFlows {
 			if flowList, ok := apiPoliciesBlock[flow].([]interface{}); ok {
 				for _, polRaw := range flowList {
 					if pol, ok := polRaw.(map[string]interface{}); ok {
-						if pName, ok := pol["policyName"].(string); ok && pName == name {
+						if pName, ok := pol["policyName"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 							return true
 						}
 					}
@@ -530,7 +552,7 @@ func hasPolicyInApiDetail(apiDetail map[string]any, name string) bool {
 						if flowList, ok := opPolicies[flow].([]interface{}); ok {
 							for _, polRaw := range flowList {
 								if pol, ok := polRaw.(map[string]interface{}); ok {
-									if pName, ok := pol["policyName"].(string); ok && pName == name {
+									if pName, ok := pol["policyName"].(string); ok && CleanPolicyName(pName) == cleanTarget {
 										return true
 									}
 								}

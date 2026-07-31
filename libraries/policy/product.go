@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"wso2/pctl/libraries/client"
 )
 
@@ -135,11 +136,13 @@ func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPoli
 		return false
 	}
 
+	cleanName := CleanPolicyName(policyName)
+
 	filter := ""
 	if len(policyFilter) > 0 {
 		filter = policyFilter[0]
 	}
-	if filter != "" && policyName != filter {
+	if filter != "" && CleanPolicyName(filter) != cleanName {
 		return false
 	}
 
@@ -157,15 +160,16 @@ func resolveSingleProductPolicy(pol map[string]interface{}, flow string, allPoli
 		return false
 	}
 
-	if currentVersionNumber < policyVersionNumber {
+	if currentVersionNumber < policyVersionNumber || strings.Contains(policyName, "_imported") {
 		log.Printf(
 			"Updating API Product operation policy [%s flow] %s: %s -> %s",
 			flow, policyName, currentVersion, policyVersion,
 		)
+		pol["policyName"] = cleanName
 		pol["policyId"] = policyId
 		pol["policyVersion"] = policyVersion
 		if changedPolicies != nil {
-			*changedPolicies = append(*changedPolicies, policyName)
+			*changedPolicies = append(*changedPolicies, cleanName)
 		}
 		return true
 	}
@@ -181,8 +185,14 @@ func findNewestProductPolicyByName(name string, allPolicies []map[string]interfa
 	latestVersion := ""
 	latestNumber := -1
 
+	cleanTarget := CleanPolicyName(name)
+
 	for _, policy := range allPolicies {
-		if policy["name"] != name {
+		pName, _ := policy["name"].(string)
+		if pName == "" {
+			pName, _ = policy["displayName"].(string)
+		}
+		if CleanPolicyName(pName) != cleanTarget {
 			continue
 		}
 
