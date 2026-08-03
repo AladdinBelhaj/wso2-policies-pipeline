@@ -262,7 +262,7 @@ func ReviewProductRevisionsNumber(productId string) (string, bool) {
 
 // GetProductRevisionIds fetches the ID of each revision for an API Product sorted from oldest to newest.
 func GetProductRevisionIds(productId string) ([]string, error) {
-	url := vars.BaseURL + "/api-products/" + productId + "/revisions"
+	url := vars.BaseURL + PathAPIProduct + productId + "/revisions"
 	statusCode, body, err := doRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func UndeployProductRevision(productId string, revisionId string) error {
 	if err != nil {
 		payload = []byte(`[{"name":"Default","displayOnDevportal":false}]`)
 	}
-	url := vars.BaseURL + "/api-products/" + productId + "/undeploy-revision?revisionId=" + revisionId
+	url := vars.BaseURL + PathAPIProduct + productId + "/undeploy-revision?revisionId=" + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("undeploy product revision %s", revisionId)); err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ func UndeployProductRevision(productId string, revisionId string) error {
 
 // DeleteProductRevision deletes an API Product revision
 func DeleteProductRevision(productId string, revisionId string) error {
-	url := vars.BaseURL + "/api-products/" + productId + "/revisions/" + revisionId
+	url := vars.BaseURL + PathAPIProduct + productId + "/revisions/" + revisionId
 	if _, err := executeRevisionRequest(http.MethodDelete, url, nil, fmt.Sprintf("delete product revision %s", revisionId)); err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func DeleteProductRevision(productId string, revisionId string) error {
 // CreateProductRevision creates a new revision for an API Product.
 func CreateProductRevision(productId string) string {
 	payload := []byte(`{}`)
-	url := vars.BaseURL + "/api-products/" + productId + "/revisions"
+	url := vars.BaseURL + PathAPIProduct + productId + "/revisions"
 
 	statusCode, body, err := doRequest(http.MethodPost, url, payload)
 	if err != nil {
@@ -355,7 +355,7 @@ func DeployProductRevision(productId string, revisionId string) error {
 		return fmt.Errorf("failed to marshal deploy payload for API Product %s: %w", productId, err)
 	}
 
-	url := vars.BaseURL + "/api-products/" + productId + "/deploy-revision?revisionId=" + revisionId
+	url := vars.BaseURL + PathAPIProduct + productId + "/deploy-revision?revisionId=" + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("deploy product revision %s", revisionId)); err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func DeployProductRevision(productId string, revisionId string) error {
 // RestoreProductRevision restores a previous revision for an API Product.
 func RestoreProductRevision(productId string, revisionId string) error {
 	payload := []byte{}
-	url := vars.BaseURL + "/api-products/" + productId + "/restore-revision?revisionId=" + revisionId
+	url := vars.BaseURL + PathAPIProduct + productId + "/restore-revision?revisionId=" + revisionId
 	if _, err := executeRevisionRequest(http.MethodPost, url, payload, fmt.Sprintf("restore product revision %s", revisionId)); err != nil {
 		return err
 	}
