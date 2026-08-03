@@ -25,29 +25,12 @@ func FindApiProductsUsingApis(apiIds []string) []ApiProductRef {
 		return nil
 	}
 
-	idSet := make(map[string]bool, len(apiIds))
-	for _, id := range apiIds {
-		idSet[id] = true
-	}
-
 	productSummaries := ExtractApiProductSummaries()
-	var refs []ApiProductRef
-
-	for idx, summary := range productSummaries {
-		log.Printf("[%d/%d] Scanning API Product %s to check API references...", idx+1, len(productSummaries), summary.Name)
-		var product map[string]any
-		data := GetApiProductDetailsJsonObject(summary.ID)
-		if err := json.Unmarshal(data, &product); err != nil {
-			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
-			continue
-		}
-
-		if matched := referencedApiIds(product, idSet); len(matched) > 0 {
-			refs = append(refs, ApiProductRef{ProductID: summary.ID, ApiIDs: matched})
-		}
-	}
-
-	return refs
+	return collectApiProductRefsFromSummaries(apiIds, productSummaries, func(productID string) ([]byte, error) {
+		return GetApiProductDetailsJsonObject(productID), nil
+	}, func(productID string, matched []string) ApiProductRef {
+		return ApiProductRef{ProductID: productID, ApiIDs: matched}
+	})
 }
 
 func referencedApiIds(product map[string]any, idSet map[string]bool) []string {
@@ -67,6 +50,37 @@ func referencedApiIds(product map[string]any, idSet map[string]bool) []string {
 		}
 	}
 	return matched
+}
+
+func collectApiProductRefsFromSummaries(apiIds []string, productSummaries []ApiProductSummary, fetchProduct func(productID string) ([]byte, error), buildRef func(productID string, matched []string) ApiProductRef) []ApiProductRef {
+	idSet := make(map[string]bool, len(apiIds))
+	for _, id := range apiIds {
+		idSet[id] = true
+	}
+
+	var refs []ApiProductRef
+
+	for idx, summary := range productSummaries {
+		log.Printf("[%d/%d] Scanning API Product %s to check API references...", idx+1, len(productSummaries), summary.Name)
+
+		data, err := fetchProduct(summary.ID)
+		if err != nil {
+			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
+			continue
+		}
+
+		var product map[string]any
+		if err := json.Unmarshal(data, &product); err != nil {
+			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
+			continue
+		}
+
+		if matched := referencedApiIds(product, idSet); len(matched) > 0 {
+			refs = append(refs, buildRef(summary.ID, matched))
+		}
+	}
+
+	return refs
 }
 
 // This function executes an HTTP GET to fetch the JSON object from the /apis endpoint.
@@ -329,19 +343,6 @@ func ExtractApiProductIds() []string {
 	return ids
 }
 
-func ExtractApiProductPolicies(productIds []string) map[string]map[string]any {
-	details := make(map[string]map[string]any, len(productIds))
-	for idx, id := range productIds {
-		log.Printf("[%d/%d] Fetching details for API Product %s...", idx+1, len(productIds), GetApiProductName(id))
-		var product map[string]any
-		if err := json.Unmarshal(GetApiProductDetailsJsonObject(id), &product); err != nil {
-			log.Fatal(err)
-		}
-		details[id] = product
-	}
-	return details
-}
-
 // policies lists the exact operation-level policies that were attempted in
 // this update, so a failure can be logged with full context.
 func PutApiProductUpdate(apiProductId string, payload []byte, policies []string) error {
@@ -361,24 +362,6 @@ func PutApiProductUpdate(apiProductId string, payload []byte, policies []string)
 	return fmt.Errorf("HTTP %d", statusCode)
 }
 
-func productReferencesApis(product map[string]any, idSet map[string]bool) bool {
-	apis, ok := product["apis"].([]interface{})
-	if !ok {
-		return false
-	}
-
-	for _, apiRaw := range apis {
-		api, ok := apiRaw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if apiId, ok := api["apiId"].(string); ok && idSet[apiId] {
-			return true
-		}
-	}
-	return false
-}
-
 // This function returns the IDs of API products that reference any of the given API IDs
 // in their apis[].apiId list.
 func FindApiProductIdsUsingApis(apiIds []string) []string {
@@ -386,28 +369,17 @@ func FindApiProductIdsUsingApis(apiIds []string) []string {
 		return nil
 	}
 
-	idSet := make(map[string]bool, len(apiIds))
-	for _, id := range apiIds {
-		idSet[id] = true
-	}
-
 	productSummaries := ExtractApiProductSummaries()
-	var matched []string
+	refs := collectApiProductRefsFromSummaries(apiIds, productSummaries, func(productID string) ([]byte, error) {
+		return GetApiProductDetailsJsonObject(productID), nil
+	}, func(productID string, _ []string) ApiProductRef {
+		return ApiProductRef{ProductID: productID}
+	})
 
-	for idx, summary := range productSummaries {
-		log.Printf("[%d/%d] Scanning API Product %s to check API references...", idx+1, len(productSummaries), summary.Name)
-		var product map[string]any
-		data := GetApiProductDetailsJsonObject(summary.ID)
-		if err := json.Unmarshal(data, &product); err != nil {
-			log.Printf("failed to fetch details for API product %s: %v", summary.ID, err)
-			continue
-		}
-
-		if productReferencesApis(product, idSet) {
-			matched = append(matched, summary.ID)
-		}
+	matched := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		matched = append(matched, ref.ProductID)
 	}
-
 	return matched
 }
 

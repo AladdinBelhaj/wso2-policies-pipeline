@@ -17,51 +17,6 @@ const (
 
 var policyFlows = []string{"request", "response", "fault"}
 
-// This function iterates over the already-fetched API details, resolves policy IDs by name, and PUTs the result back.
-// func UpdateApiPolicies(apiDetails map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
-// 	for apiId, apiDetail := range apiDetails {
-// 		processSingleApi(apiId, apiDetail, allPolicies, policyFilter...)
-// 	}
-// }
-
-// func processSingleApi(apiId string, apiDetail map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) {
-// 	apiName, ok := apiDetail["name"].(string)
-// 	if !ok {
-// 		log.Println("API name not found")
-// 		return
-// 	}
-
-// 	fmt.Printf("Updating API: %s\n", apiName)
-
-// 	apiScopedPolicies := append(
-// 		append([]map[string]interface{}{}, allPolicies...),
-// 		client.ExtractApiLevelPolicies(apiId)...,
-// 	)
-
-// 	modified := updateApiLevelPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...)
-// 	if updateOperationsPoliciesBlock(apiDetail, apiScopedPolicies, policyFilter...) {
-// 		modified = true
-// 	}
-
-// 	if !modified {
-// 		log.Printf("No changes detected for API %s. Skipping update and deployment.", apiId)
-// 		return
-// 	}
-
-// 	if modified {
-// 		updatedJson, err := json.Marshal(apiDetail)
-// 		if err != nil {
-// 			log.Fatalf("failed to marshal API JSON: %v", err)
-// 		}
-// 		if err := client.PutApiUpdate(apiId, updatedJson); err != nil {
-// 			log.Printf("failed to update API %s: %v", apiName, err)
-// 			return
-// 		}
-// 	}
-
-//		client.PrepareAndDeployRevision(apiId)
-//	}
-//
 // UpdateApiPolicies applies policy updates to each API and returns a map of
 // apiId -> whether that API's policies were actually changed (and deployed).
 func UpdateApiPolicies(apiDetails map[string]map[string]any, allPolicies []map[string]interface{}, policyFilter ...string) map[string]bool {

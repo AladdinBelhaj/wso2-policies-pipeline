@@ -477,37 +477,3 @@ func policyListsEqual(a interface{}, b []interface{}) bool {
 	}
 	return string(aJson) == string(bJson)
 }
-
-// stripApiProductOperations returns a copy of productDetail with "operations"
-// removed from every entry in "apis", so the first PUT registers as a real change.
-func stripApiProductOperations(productDetail map[string]any) map[string]any {
-	stripped := make(map[string]any, len(productDetail))
-	for k, v := range productDetail {
-		stripped[k] = v
-	}
-
-	apis, ok := stripped["apis"].([]interface{})
-	if !ok {
-		return stripped
-	}
-
-	strippedApis := make([]interface{}, 0, len(apis))
-	for _, apiRaw := range apis {
-		api, ok := apiRaw.(map[string]interface{})
-		if !ok {
-			strippedApis = append(strippedApis, apiRaw)
-			continue
-		}
-		strippedApi := make(map[string]interface{}, len(api))
-		for k, v := range api {
-			if k == "operations" {
-				continue
-			}
-			strippedApi[k] = v
-		}
-		strippedApis = append(strippedApis, strippedApi)
-	}
-	stripped["apis"] = strippedApis
-
-	return stripped
-}
