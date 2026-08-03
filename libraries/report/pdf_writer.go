@@ -90,8 +90,12 @@ func (pw *PDFWriter) EnsureSpace(needed float64) {
 }
 
 func (pw *PDFWriter) AddSectionHeader(title string) {
-	pw.EnsureSpace(28.0)
-	pw.currentY -= 6.0
+	pw.EnsureSpace(38.0)
+	// Some callers (e.g. AddTextLine) leave the cursor sitting exactly at the
+	// previous line's baseline with no trailing buffer of their own. Section
+	// headers can't assume any particular amount of space was left behind,
+	// so they enforce their own generous gap unconditionally.
+	pw.currentY -= 16.0
 
 	x := pw.margin
 	y := pw.currentY
@@ -110,8 +114,9 @@ func (pw *PDFWriter) AddSectionHeader(title string) {
 
 func (pw *PDFWriter) AddMetadataBox(items []KeyVal, statusBadge string) {
 	rowHeight := 14.0
-	numRows := (len(items) + 1) / 2
-	boxHeight := float64(numRows)*rowHeight + 14.0
+	// Single column: one field per row, so long values (e.g. Base URL) get
+	// the full box width instead of being squeezed into a half-width column.
+	boxHeight := float64(len(items))*rowHeight + 14.0
 
 	pw.EnsureSpace(boxHeight + 8.0)
 
@@ -144,24 +149,31 @@ func (pw *PDFWriter) AddMetadataBox(items []KeyVal, statusBadge string) {
 		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", badgeX+6.0, badgeY+4.0, pdfEscape(statusBadge)))
 	}
 
-	currY := y + boxHeight - 14.0
-	col1X := x + 10.0
-	col2X := x + (w / 2) + 5.0
-
-	for i := 0; i < len(items); i += 2 {
-		// Column 1
-		pw.addOp("BT /F2 8.5 Tf 0.2 0.25 0.35 rg")
-		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s:) Tj ET", col1X, currY, pdfEscape(items[i].Key)))
-		pw.addOp("BT /F1 8.5 Tf 0.1 0.1 0.1 rg")
-		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", col1X+80.0, currY, pdfEscape(items[i].Val)))
-
-		// Column 2
-		if i+1 < len(items) {
-			pw.addOp("BT /F2 8.5 Tf 0.2 0.25 0.35 rg")
-			pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s:) Tj ET", col2X, currY, pdfEscape(items[i+1].Key)))
-			pw.addOp("BT /F1 8.5 Tf 0.1 0.1 0.1 rg")
-			pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", col2X+80.0, currY, pdfEscape(items[i+1].Val)))
+	// Size the label column to the longest key actually present, instead of a
+	// fixed offset, so labels like "API Target Filter:" never crowd the value.
+	maxKeyLen := 0
+	for _, item := range items {
+		if l := len(item.Key); l > maxKeyLen {
+			maxKeyLen = l
 		}
+	}
+	labelWidth := float64(maxKeyLen+1)*8.5*0.6 + 12.0 // +1 for ":", 0.6 ~ Helvetica-Bold avg width
+	if labelWidth < 90.0 {
+		labelWidth = 90.0
+	}
+
+	valueX := x + 10.0 + labelWidth
+	valueMaxWidth := (x + w - 10.0) - valueX
+	if valueMaxWidth < 50.0 {
+		valueMaxWidth = 50.0
+	}
+
+	currY := y + boxHeight - 14.0
+	for _, item := range items {
+		pw.addOp("BT /F2 8.5 Tf 0.2 0.25 0.35 rg")
+		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s:) Tj ET", x+10.0, currY, pdfEscape(item.Key)))
+		pw.addOp("BT /F1 8.5 Tf 0.1 0.1 0.1 rg")
+		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", valueX, currY, pdfEscape(truncateText(item.Val, valueMaxWidth, 8.5))))
 
 		currY -= rowHeight
 	}
@@ -197,20 +209,33 @@ func (pw *PDFWriter) AddStatCards(cards []StatCard) {
 }
 
 func (pw *PDFWriter) AddEntityHeader(kind, name, id, status string) {
-	pw.EnsureSpace(22.0)
+	// Two-line box: name + status share the top line; the ID gets its own
+	// full-width line below so a full UUID is shown instead of being
+	// squeezed into a narrow column next to the name and status badge.
+	row1H := 14.0
+	row2H := 12.0
+	boxH := row1H + row2H
+
+	pw.EnsureSpace(boxH + 6.0)
 
 	x := pw.margin
 	w := pw.pageWidth - (2 * pw.margin)
-	y := pw.currentY - 18.0
+	y := pw.currentY - boxH
 
 	pw.addOp("0.9 0.94 0.97 rg 0.75 0.82 0.9 RG 1 w")
-	pw.addOp(fmt.Sprintf("%.2f %.2f %.2f %.2f re b", x, y, w, 18.0))
+	pw.addOp(fmt.Sprintf("%.2f %.2f %.2f %.2f re b", x, y, w, boxH))
+
+	entityX := x + 8.0
+	statusW := 100.0
+	statusX := x + w - statusW - 4.0
+	nameMaxWidth := statusX - entityX - 8.0
+
+	row1Y := y + row2H + 4.0 // baseline for the top (name/status) line
+	row2Y := y + 4.0         // baseline for the bottom (ID) line
 
 	pw.addOp("BT /F2 9.5 Tf 0.12 0.23 0.38 rg")
-	pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s: %s) Tj ET", x+8.0, y+5.0, pdfEscape(kind), pdfEscape(name)))
-
-	pw.addOp("BT /F3 8 Tf 0.3 0.35 0.4 rg")
-	pw.addOp(fmt.Sprintf("%.2f %.2f Td (ID: %s) Tj ET", x+240.0, y+5.0, pdfEscape(id)))
+	nameLabel := truncateText(fmt.Sprintf("%s: %s", kind, name), nameMaxWidth, 9.5)
+	pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", entityX, row1Y, pdfEscape(nameLabel)))
 
 	if status != "" {
 		if strings.Contains(status, "FAIL") || strings.Contains(status, "CANCEL") {
@@ -218,8 +243,15 @@ func (pw *PDFWriter) AddEntityHeader(kind, name, id, status string) {
 		} else {
 			pw.addOp("BT /F2 8 Tf 0.1 0.55 0.2 rg")
 		}
-		pw.addOp(fmt.Sprintf("%.2f %.2f Td ([%s]) Tj ET", x+w-110.0, y+5.0, pdfEscape(status)))
+		statusLabel := truncateText(fmt.Sprintf("[%s]", status), statusW, 8.0)
+		pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", statusX, row1Y+0.5, pdfEscape(statusLabel)))
 	}
+
+	// Full ID on its own line, with the whole box width available — a
+	// standard 36-char UUID fits comfortably without truncation.
+	pw.addOp("BT /F3 7.5 Tf 0.3 0.35 0.4 rg")
+	idLabel := truncateTextMono(fmt.Sprintf("ID: %s", id), w-16.0, 7.5)
+	pw.addOp(fmt.Sprintf("%.2f %.2f Td (%s) Tj ET", entityX, row2Y, pdfEscape(idLabel)))
 
 	pw.currentY = y - 6.0
 }
@@ -423,6 +455,23 @@ func pdfEscape(s string) string {
 
 func truncateText(text string, maxWidth float64, fontSize float64) string {
 	charWidth := fontSize * 0.52
+	maxChars := int(maxWidth / charWidth)
+	if maxChars < 3 {
+		maxChars = 3
+	}
+	if len(text) > maxChars {
+		return text[:maxChars-2] + ".."
+	}
+	return text
+}
+
+// truncateTextMono is like truncateText but for monospaced fonts (e.g. Courier,
+// used for /F3). Courier's advance width is a fixed 0.6em per character, which
+// is noticeably wider than the 0.52 heuristic tuned for proportional Helvetica;
+// reusing truncateText for Courier text under-truncates and causes overlap
+// with neighboring fields.
+func truncateTextMono(text string, maxWidth float64, fontSize float64) string {
+	charWidth := fontSize * 0.62 // 0.6em nominal + small safety margin
 	maxChars := int(maxWidth / charWidth)
 	if maxChars < 3 {
 		maxChars = 3
