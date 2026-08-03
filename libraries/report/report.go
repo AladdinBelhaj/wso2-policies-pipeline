@@ -102,8 +102,15 @@ func GenerateUpdateReport(data UpdateReportData) (string, string) {
 	pdfFileName := fmt.Sprintf("update_report_%s.pdf", timeStr)
 	txtFileName := fmt.Sprintf("update_report_%s.txt", timeStr)
 
-	pdfPath := filepath.Join(vars.LogsDir, pdfFileName)
-	txtPath := filepath.Join(vars.LogsDir, txtFileName)
+	reportsDir := filepath.Join(vars.LogsDir, "reports")
+
+	if err := os.MkdirAll(reportsDir, 0755); err != nil {
+		log.Printf("Error creating reports directory: %v", err)
+		return "", ""
+	}
+
+	pdfPath := filepath.Join(reportsDir, pdfFileName)
+	txtPath := filepath.Join(reportsDir, txtFileName)
 
 	// Build PDF Document
 	pw := NewPDFWriter("WSO2 POLICY PIPELINE REPORT", "POLICY UPDATE REPORT")
@@ -254,8 +261,15 @@ func GenerateRollbackReport(data RollbackReportData) (string, string) {
 	pdfFileName := fmt.Sprintf("rollback_report_%s.pdf", timeStr)
 	txtFileName := fmt.Sprintf("rollback_report_%s.txt", timeStr)
 
-	pdfPath := filepath.Join(vars.LogsDir, pdfFileName)
-	txtPath := filepath.Join(vars.LogsDir, txtFileName)
+	reportsDir := filepath.Join(vars.LogsDir, "reports")
+
+	if err := os.MkdirAll(reportsDir, 0755); err != nil {
+		log.Printf("Error creating reports directory: %v", err)
+		return "", ""
+	}
+
+	pdfPath := filepath.Join(reportsDir, pdfFileName)
+	txtPath := filepath.Join(reportsDir, txtFileName)
 
 	// Build PDF Document
 	pw := NewPDFWriter("WSO2 POLICY PIPELINE REPORT", "REVISION ROLLBACK REPORT")
