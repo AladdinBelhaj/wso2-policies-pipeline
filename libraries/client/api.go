@@ -11,6 +11,7 @@ import (
 const (
 	PathAPI               = "/apis/"
 	PathOperationPolicies = "/operation-policies?limit=100"
+	PathAPIProduct        = "/api-products/"
 )
 
 type ApiProductRef struct {
@@ -244,12 +245,12 @@ func getApiProductJsonObject() []byte {
 }
 
 func GetApiProductDetailsJsonObject(apiProductId string) []byte {
-	return getJSON(vars.BaseURL + "/api-products/" + apiProductId)
+	return getJSON(vars.BaseURL + PathAPIProduct + apiProductId)
 }
 
 // GetApiProductDeployments fetches the deployments list for an API product from GET /api-products/{apiProductId}/deployments
 func GetApiProductDeployments(apiProductId string) []Deployment {
-	url := vars.BaseURL + "/api-products/" + apiProductId + "/deployments"
+	url := vars.BaseURL + PathAPIProduct + apiProductId + "/deployments"
 	statusCode, body, err := doRequest(http.MethodGet, url, nil)
 	if err != nil || statusCode < 200 || statusCode >= 300 {
 		return defaultDeployments()
@@ -346,7 +347,7 @@ func ExtractApiProductIds() []string {
 // policies lists the exact operation-level policies that were attempted in
 // this update, so a failure can be logged with full context.
 func PutApiProductUpdate(apiProductId string, payload []byte, policies []string) error {
-	url := vars.BaseURL + "/api-products/" + apiProductId
+	url := vars.BaseURL + PathAPIProduct + apiProductId
 	statusCode, body, err := doRequest(http.MethodPut, url, payload)
 	if err != nil {
 		return fmt.Errorf("PUT /api-products/%s error: %v", apiProductId, err)
