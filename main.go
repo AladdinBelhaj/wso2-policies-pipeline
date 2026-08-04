@@ -23,6 +23,13 @@ var (
 	addEnvBaseURL  string
 	addEnvUsername string
 	addEnvPassword string
+
+	publishDisplayName string
+	publishCategory    string
+	publishDescription string
+	publishFlows       []string
+	publishApiTypes    []string
+	publishGateways    []string
 )
 
 var rootCmd = &cobra.Command{
@@ -66,6 +73,30 @@ var rollbackCmd = &cobra.Command{
 	},
 }
 
+var publishPolicyCmd = &cobra.Command{
+	Use:   "publish-policy [POLICY_NAME] [DEFINITION_FILE.j2]",
+	Short: "Publish a new version of an operation policy from a Synapse .j2 definition to WSO2",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := vars.ResolveEnv(); err != nil {
+			log.Fatal(err)
+		}
+		opts := policy.PublishPolicyOptions{
+			Name:              args[0],
+			DefinitionPath:    args[1],
+			DisplayName:       publishDisplayName,
+			Category:          publishCategory,
+			Description:       publishDescription,
+			ApplicableFlows:   publishFlows,
+			SupportedApiTypes: publishApiTypes,
+			SupportedGateways: publishGateways,
+		}
+		if err := policy.PublishPolicy(opts); err != nil {
+			log.Fatal(err)
+		}
+	},
+}
+
 var setEnvCmd = &cobra.Command{
 	Use:   "set-env [ENV_NAME]",
 	Short: "Persist the environment pctl should use for subsequent commands",
@@ -105,8 +136,16 @@ func init() {
 	addEnvCmd.Flags().StringVar(&addEnvUsername, "username", "", "Username for the new environment")
 	addEnvCmd.Flags().StringVar(&addEnvPassword, "password", "", "Password for the new environment")
 
+	publishPolicyCmd.Flags().StringVar(&publishDisplayName, "display-name", "", "Display name shown in the WSO2 UI (defaults to POLICY_NAME)")
+	publishPolicyCmd.Flags().StringVar(&publishCategory, "category", "Mediation", "Policy category")
+	publishPolicyCmd.Flags().StringVar(&publishDescription, "description", "", "Policy description")
+	publishPolicyCmd.Flags().StringSliceVar(&publishFlows, "flows", []string{"request", "response", "fault"}, "Applicable flows")
+	publishPolicyCmd.Flags().StringSliceVar(&publishApiTypes, "api-types", []string{"HTTP"}, "Supported API types")
+	publishPolicyCmd.Flags().StringSliceVar(&publishGateways, "gateways", []string{"Synapse"}, "Supported gateways")
+
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(rollbackCmd)
+	rootCmd.AddCommand(publishPolicyCmd)
 	rootCmd.AddCommand(setEnvCmd)
 	rootCmd.AddCommand(addEnvCmd)
 }

@@ -92,7 +92,7 @@ type RollbackReportData struct {
 	Products     []ProductRollbackDetail
 }
 
-// GenerateUpdateReport creates an extensive PDF report and text log for a policy update.
+// GenerateUpdateReport creates a PDF report and text log for a policy update.
 func GenerateUpdateReport(data UpdateReportData) (string, string) {
 	if data.Timestamp.IsZero() {
 		data.Timestamp = time.Now()
@@ -144,7 +144,7 @@ func GenerateUpdateReport(data UpdateReportData) (string, string) {
 		}
 	}
 
-	pw.AddStatCards([]StatCard{
+	pw.AddStatCards([]StatCard{ 
 		{Label: "Total APIs Targeted", Value: fmt.Sprintf("%d", len(data.APIs))},
 		{Label: "APIs Modified", Value: fmt.Sprintf("%d", modifiedCount)},
 		{Label: "API Products Targeted", Value: fmt.Sprintf("%d", len(data.Products))},
@@ -243,7 +243,7 @@ func GenerateUpdateReport(data UpdateReportData) (string, string) {
 	appendToCentralLog("UPDATE", data.Environment, data.Status, fmt.Sprintf("APIs modified: %d/%d, PDF: %s", modifiedCount, len(data.APIs), pdfFileName))
 
 	log.Printf("================================================================================")
-	log.Printf("Extensive PDF Report generated successfully:")
+	log.Printf("PDF Report generated successfully:")
 	log.Printf("  [PDF Report] -> %s", pdfPath)
 	log.Printf("  [Text Log]   -> %s", txtPath)
 	log.Printf("================================================================================")
@@ -251,7 +251,7 @@ func GenerateUpdateReport(data UpdateReportData) (string, string) {
 	return pdfPath, txtPath
 }
 
-// GenerateRollbackReport creates an extensive PDF report and text log for a revision rollback.
+// GenerateRollbackReport creates a PDF report and text log for a revision rollback.
 func GenerateRollbackReport(data RollbackReportData) (string, string) {
 	if data.Timestamp.IsZero() {
 		data.Timestamp = time.Now()
@@ -397,7 +397,7 @@ func GenerateRollbackReport(data RollbackReportData) (string, string) {
 	appendToCentralLog("ROLLBACK", data.Environment, data.Status, fmt.Sprintf("APIs rolled back: %d/%d, PDF: %s", rolledBackApis, len(data.APIs), pdfFileName))
 
 	log.Printf("================================================================================")
-	log.Printf("Extensive PDF Report generated successfully:")
+	log.Printf("PDF Report generated successfully:")
 	log.Printf("  [PDF Report] -> %s", pdfPath)
 	log.Printf("  [Text Log]   -> %s", txtPath)
 	log.Printf("================================================================================")
