@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        WSO2_CREDS    = credentials('wso2-publisher-creds') // -> WSO2_CREDS_USR / WSO2_CREDS_PSW
+        WSO2_CREDS    = credentials('wso2-publisher-creds')
         WSO2_BASE_URL = 'https://localhost:9443/api/am/publisher/v4'
         PCTL_BIN      = "${WORKSPACE}\\bin"
     }
@@ -47,14 +47,14 @@ exit /b 0''',
                 }
             }
         }
-        stage('Lint policies') {
+    stage('Lint policies') {
             when {
                 expression { env.CHANGED_POLICIES }
             }
             steps {
                 bat '''
                     python -m pip install --user --quiet j2lint
-                    j2lint %CHANGED_POLICIES%
+                    python -m j2lint %CHANGED_POLICIES%
                 '''
             }
         }
