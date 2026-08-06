@@ -1,6 +1,6 @@
 <sequence xmlns="http://ws.apache.org/ns/synapse" name="{{ policy_name | default('AddResponseHeader') }}">
     <property name="{{ header_name | default('X-Custom-Header') }}"
-              value="{{ header_value | default('pctl-test') }}"
+              value="{{ header_value | default('pctl-test-second') }}"
               scope="transport"
               type="STRING"/>
 </sequence>
